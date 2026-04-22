@@ -1,0 +1,9 @@
+# System files
+.DS_Store
+node_modules/
+dist/
+*.local
+
+# Secrets
+.env
+.env.local
