@@ -1,16 +1,21 @@
-# React + Vite
+# 🌳 Kinship: Premium Family Tree Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Kinship is a high-end, full-stack family tree visualization platform. It features a modern, glassmorphic UI and an interactive infinite canvas for mapping out family lineages with persistent positions and relationships.
 
-Currently, two official plugins are available:
+## ✨ Core Features
+- **Interactive Canvas**: Infinite zoomable/pannable workspace.
+- **Circular Portraits**: Elegant circular nodes for family members.
+- **Relationship Persistence**: Drag-to-connect parents and children.
+- **Position Memory**: Members stay exactly where you place them.
+- **Spouse Indicators**: Visual heart markers for marriages.
+- **Profile Sidebar**: Detailed biographical management for every member.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Tech Stack
+- **Frontend**: React (Vite), React Flow, Framer Motion, Lucide Icons.
+- **Backend**: Node.js & Express.
+- **Database**: Supabase (PostgreSQL).
+- **Styling**: Modern Glassmorphic Vanilla CSS.
 
-## React Compiler
+## 📄 License
+MIT License - Created by [Krishnanand](https://github.com/Krishnanand-10).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
