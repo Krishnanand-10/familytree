@@ -5,7 +5,8 @@
   --navbar-bg: #ffffff;
   --text-main: #333333;
   --text-muted: #666666;
-  --primary-color: #ff6b35; /* MyHeritage orange */
+  --primary-color: #ff6b35;
+  /* MyHeritage orange */
   --male-color: #2196f3;
   --female-color: #e91e63;
   --node-bg: #ffffff;
@@ -24,7 +25,8 @@ body {
   font-family: var(--font-family);
   background-color: var(--bg-color);
   color: var(--text-main);
-  overflow: hidden; /* Flow component handles its own scroll */
+  overflow: hidden;
+  /* Flow component handles its own scroll */
 }
 
 #root {
@@ -43,7 +45,7 @@ body {
   padding: 0 24px;
   border-bottom: 1px solid #e0e0e0;
   z-index: 100;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .navbar-left {
@@ -89,7 +91,7 @@ body {
 
 .nav-link:hover {
   color: var(--text-main);
-  background: rgba(0,0,0,0.04);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .nav-link.active {
@@ -125,7 +127,58 @@ body {
   stroke-width: 2;
 }
 
-/* Member Node Styles */
+/* --- PREMIUM & ELEGANT HANDLES --- */
+
+.react-flow__handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: white !important;
+  border: 2px solid #ddd !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  opacity: 0.3; /* Subtle by default */
+  z-index: 50;
+}
+
+/* Show handles more clearly when the member card is hovered */
+.member-node:hover ~ .react-flow__handle,
+.member-node:hover .react-flow__handle {
+  opacity: 1;
+}
+
+/* Expand and glow when the mouse gets close */
+.react-flow__handle:hover {
+  transform: scale(1.8);
+  opacity: 1;
+  background: #fff !important;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* The "Magnet" - Keep the huge hit area but keep it invisible */
+.react-flow__handle::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  background: transparent;
+  cursor: crosshair;
+}
+
+/* Distinctive but subtle colors for handle types */
+.react-flow__handle[id$="-out"]:hover {
+  border-color: var(--primary-color) !important;
+}
+
+.react-flow__handle[id$="-in"]:hover {
+  border-color: #4CAF50 !important;
+}
+
+.react-flow__handle[id^="spouse-"]:hover {
+  border-color: #ff4081 !important;
+}
+
+/* Member Node Styles - Restored to Original Look */
 .member-node {
   background: var(--node-bg);
   border-radius: 8px;
@@ -134,7 +187,7 @@ body {
   box-shadow: var(--node-shadow);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible; /* Required for handles */
   border: 1px solid #ddd;
   transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -204,19 +257,18 @@ body {
   flex: 1;
   border: none;
   background: none;
-  padding: 8px;
-  font-size: 18px;
-  color: #aaa;
+  padding: 10px;
+  color: #888;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: all 0.2s;
 }
 
 .action-btn:hover {
   color: var(--primary-color);
-  background: #f0f0f0;
+  background: rgba(255, 107, 53, 0.05);
 }
 
 /* Custom Edge Labels */
@@ -228,7 +280,7 @@ body {
   font-size: 10px;
   font-weight: 600;
   color: #666;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .edge-controls-container {
@@ -250,7 +302,7 @@ body {
 .edge-action-menu {
   background: white;
   border-radius: 30px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   display: flex;
   padding: 4px;
   border: 1px solid #ff6b35;
@@ -273,11 +325,13 @@ body {
 }
 
 .edge-menu-btn.add {
-  color: #ff6b35; /* Primary Orange */
+  color: #ff6b35;
+  /* Primary Orange */
 }
 
 .edge-menu-btn.unlink {
-  color: #e91e63; /* Pink/Red */
+  color: #e91e63;
+  /* Pink/Red */
 }
 
 .edge-menu-btn.add:hover {
@@ -322,14 +376,21 @@ body {
   width: 100%;
   max-width: 450px;
   border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   animation: modalIn 0.3s ease-out;
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-header {
