@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { User, Users, Plus, Edit2 } from 'lucide-react';
+import { User, Users, Plus, Edit2, UserPlus } from 'lucide-react';
 
 const MemberNode = ({ data, id }) => {
   const { name, birthYear, deathYear, gender, imageUrl, isAlive, onAddRelative, onEdit } = data;
@@ -22,31 +22,6 @@ const MemberNode = ({ data, id }) => {
       <Handle type="source"  position={Position.Right}  id="spouse-out" />
       <Handle type="target"  position={Position.Left}   id="spouse-in"  />
 
-      {/* Top-corner action buttons */}
-      <div className="portrait-actions">
-        <button
-          className="pa-btn"
-          title="Add Child"
-          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'child'); }}
-        >
-          <Plus size={12} />
-        </button>
-        <button
-          className="pa-btn"
-          title="Add Spouse"
-          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'spouse'); }}
-        >
-          <Users size={12} />
-        </button>
-        <button
-          className="pa-btn edit"
-          title="Edit"
-          onClick={(e) => { e.stopPropagation(); onEdit(id); }}
-        >
-          <Edit2 size={12} />
-        </button>
-      </div>
-
       {/* Photo */}
       <div className="portrait-photo" style={{ borderColor: accentColor }}>
         {imageUrl ? (
@@ -60,6 +35,38 @@ const MemberNode = ({ data, id }) => {
       <div className="portrait-info" onClick={() => onEdit(id)}>
         <div className="portrait-name">{name || 'Unknown'}</div>
         {dateLabel && <div className="portrait-dates">{dateLabel}</div>}
+      </div>
+
+      {/* Bottom icon strip — inside the card, shown on hover */}
+      <div className="card-icon-strip">
+        <button
+          className="cis-btn"
+          title="Add Child"
+          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'child'); }}
+        >
+          <Plus size={14} />
+        </button>
+        <button
+          className="cis-btn"
+          title="Add Spouse"
+          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'spouse'); }}
+        >
+          <Users size={14} />
+        </button>
+        <button
+          className="cis-btn"
+          title="Add Parent"
+          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'parent'); }}
+        >
+          <UserPlus size={14} />
+        </button>
+        <button
+          className="cis-btn edit"
+          title="Edit"
+          onClick={(e) => { e.stopPropagation(); onEdit(id); }}
+        >
+          <Edit2 size={14} />
+        </button>
       </div>
 
     </div>

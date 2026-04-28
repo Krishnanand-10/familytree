@@ -210,42 +210,48 @@ body {
 .member-node-portrait.male  { border-top: 4px solid var(--male-color); }
 .member-node-portrait.female { border-top: 4px solid var(--female-color); }
 
-/* ── Top-corner action buttons ────────────────────────────────────────────── */
-.portrait-actions {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+/* ── Bottom icon strip (inside card) ─────────────────────────────────────── */
+.card-icon-strip {
   display: flex;
-  gap: 3px;
+  width: 100%;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  max-height: 0;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
 }
 
-.member-node-portrait:hover .portrait-actions {
+.member-node-portrait:hover .card-icon-strip {
+  max-height: 36px;
   opacity: 1;
 }
 
-.pa-btn {
-  width: 22px;
-  height: 22px;
+.cis-btn {
+  flex: 1;
   border: none;
-  border-radius: 50%;
-  background: #f0f0f0;
-  color: #555;
+  background: transparent;
+  color: #999;
+  padding: 8px 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s, transform 0.15s;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid #f0f0f0;
 }
 
-.pa-btn:hover {
+.cis-btn:last-child {
+  border-right: none;
+}
+
+.cis-btn:hover {
   background: var(--primary-color);
   color: #fff;
-  transform: scale(1.15);
 }
 
-.pa-btn.edit:hover {
+.cis-btn.edit:hover {
   background: #2196f3;
 }
 
