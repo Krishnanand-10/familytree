@@ -6,6 +6,8 @@ import {
   Background,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   addEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -32,7 +34,9 @@ const edgeTypes = {
   marriage: MarriageEdge,
 };
 
-export default function App() {
+// Inner component that can use useReactFlow()
+function FlowApp() {
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const [treeName, setTreeName] = useState(() => {
     return localStorage.getItem('family-tree-name') || 'My Family Tree';
   });
@@ -303,16 +307,22 @@ export default function App() {
       const newId = Date.now().toString();
       const parentNode = nodes.find((n) => n.id === modalState.activeMemberId);
 
-      let x = window.innerWidth / 2 - 110;
-      let y = 100;
+      let x, y;
 
       if (parentNode) {
         x = parentNode.position.x;
         y = parentNode.position.y;
-
-        if (modalState.relativeType === 'child') y += 200;
-        if (modalState.relativeType === 'spouse') x += 250;
-        if (modalState.relativeType === 'parent') y -= 200;
+        if (modalState.relativeType === 'child') y += 220;
+        if (modalState.relativeType === 'spouse') x += 200;
+        if (modalState.relativeType === 'parent') y -= 220;
+      } else {
+        // Place new root node at center of current visible viewport
+        const center = screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+        x = center.x - 65;
+        y = center.y - 60;
       }
 
       const newNode = {
@@ -377,6 +387,8 @@ export default function App() {
       }
     }
     setModalState({ isOpen: false, mode: 'add', activeMemberId: null, relativeType: null });
+    // Always pan/zoom to show the new or edited node
+    setTimeout(() => fitView({ duration: 400, padding: 0.3 }), 50);
   };
 
   const onNodeDragStop = useCallback(() => {
@@ -484,6 +496,14 @@ export default function App() {
         onSave={handleSaveMember}
         onDelete={handleDelete}
       />
-    </>
+      </>
+  );
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <FlowApp />
+    </ReactFlowProvider>
   );
 }

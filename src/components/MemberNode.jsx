@@ -1,62 +1,67 @@
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { User, Users, Plus, Edit2, Camera } from 'lucide-react';
+import { User, Users, Plus, Edit2 } from 'lucide-react';
 
 const MemberNode = ({ data, id }) => {
   const { name, birthYear, deathYear, gender, imageUrl, isAlive, onAddRelative, onEdit } = data;
-  
-  return (
-    <div className={`member-node ${gender === 'female' ? 'female' : 'male'}`}>
-      {/* Top Handles for parents */}
-      <Handle type="target" position={Position.Top} id="parent-in" style={{ background: '#555' }} />
-      
-      <div className="member-content">
-        <div className={`member-avatar ${imageUrl ? 'has-photo' : ''}`}>
-          {imageUrl ? (
-            <img src={imageUrl} alt={name} />
-          ) : (
-            <User size={30} color={gender === 'female' ? '#e91e63' : '#2196f3'} />
-          )}
-        </div>
-        
-        <div className="member-info" onClick={() => onEdit(id)}>
-          <div className="member-name">{name}</div>
-          <div className="member-dates">
-            {birthYear} — {deathYear || (isAlive ? 'Present' : 'Unknown')}
-          </div>
-        </div>
-      </div>
 
-      <div className="member-actions">
-        <button 
-          className="action-btn" 
+  const isFemale = gender === 'female';
+  const accentColor = isFemale ? '#e91e63' : '#2196f3';
+
+  const dateLabel = [
+    birthYear || '',
+    deathYear ? deathYear : (isAlive ? 'Present' : (birthYear ? 'Unknown' : ''))
+  ].filter(Boolean).join(' – ');
+
+  return (
+    <div className={`member-node-portrait ${isFemale ? 'female' : 'male'}`}>
+
+      {/* React Flow handles */}
+      <Handle type="target"  position={Position.Top}    id="parent-in"  />
+      <Handle type="source"  position={Position.Bottom} id="child-out"  />
+      <Handle type="source"  position={Position.Right}  id="spouse-out" />
+      <Handle type="target"  position={Position.Left}   id="spouse-in"  />
+
+      {/* Top-corner action buttons */}
+      <div className="portrait-actions">
+        <button
+          className="pa-btn"
           title="Add Child"
           onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'child'); }}
         >
-          <Plus size={16} />
+          <Plus size={12} />
         </button>
-        <button 
-          className="action-btn" 
+        <button
+          className="pa-btn"
           title="Add Spouse"
           onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'spouse'); }}
         >
-          <Users size={16} />
+          <Users size={12} />
         </button>
-        <button 
-          className="action-btn" 
+        <button
+          className="pa-btn edit"
           title="Edit"
           onClick={(e) => { e.stopPropagation(); onEdit(id); }}
         >
-          <Edit2 size={16} />
+          <Edit2 size={12} />
         </button>
       </div>
 
-      {/* Bottom Handles for children */}
-      <Handle type="source" position={Position.Bottom} id="child-out" style={{ background: '#555' }} />
-      
-      {/* Side Handles for spouses */}
-      <Handle type="source" position={Position.Right} id="spouse-out" style={{ background: '#ff6b35', top: '50%' }} />
-      <Handle type="target" position={Position.Left} id="spouse-in" style={{ background: '#ff6b35', top: '50%' }} />
+      {/* Photo */}
+      <div className="portrait-photo" style={{ borderColor: accentColor }}>
+        {imageUrl ? (
+          <img src={imageUrl} alt={name} />
+        ) : (
+          <User size={36} color={accentColor} />
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="portrait-info" onClick={() => onEdit(id)}>
+        <div className="portrait-name">{name || 'Unknown'}</div>
+        {dateLabel && <div className="portrait-dates">{dateLabel}</div>}
+      </div>
+
     </div>
   );
 };
