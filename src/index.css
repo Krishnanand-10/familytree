@@ -153,17 +153,7 @@ body {
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 
-/* The "Magnet" - Keep the huge hit area but keep it invisible */
-.react-flow__handle::after {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: -20px;
-  right: -20px;
-  bottom: -20px;
-  background: transparent;
-  cursor: crosshair;
-}
+/* The hit area matches the visible dot — no oversized invisible zone */
 
 /* Distinctive but subtle colors for handle types */
 .react-flow__handle[id$="-out"]:hover {
@@ -189,7 +179,8 @@ body {
   background: #fff;
   border-radius: 12px;
   width: 130px;
-  padding: 12px 10px 14px;
+  /* extra bottom padding reserves space for the icon strip */
+  padding: 12px 10px 38px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -210,22 +201,33 @@ body {
 .member-node-portrait.male  { border-top: 4px solid var(--male-color); }
 .member-node-portrait.female { border-top: 4px solid var(--female-color); }
 
-/* ── Bottom icon strip (inside card) ─────────────────────────────────────── */
+/* ── Bottom icon strip — absolute, never changes card size ───────────────── */
 .card-icon-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
   display: flex;
-  width: 100%;
+  align-items: center;
   border-top: 1px solid #f0f0f0;
   background: #fafafa;
   border-radius: 0 0 10px 10px;
   overflow: hidden;
-  max-height: 0;
   opacity: 0;
-  transition: max-height 0.2s ease, opacity 0.2s ease;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
 }
 
 .member-node-portrait:hover .card-icon-strip {
-  max-height: 36px;
   opacity: 1;
+  pointer-events: all;
+}
+
+/* Hide strip while dragging */
+.react-flow__node.dragging .card-icon-strip {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .cis-btn {
