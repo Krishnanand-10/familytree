@@ -17,8 +17,8 @@ export default function FamilyEdge({
   selected,
 }) {
   // Set to 0 to make the marriage line and sibling line the same
-  const junctionDrop = 0; 
-  
+  const junctionDrop = 0;
+
   // Create a "Comb" path: Down -> Horizontal -> Down
   const edgePath = `M ${sourceX} ${sourceY} 
                     L ${sourceX} ${sourceY + junctionDrop} 
@@ -40,18 +40,18 @@ export default function FamilyEdge({
         className="react-flow__edge-interaction"
         style={{ cursor: 'pointer' }}
       />
-      
+
       {/* Visible edge */}
-      <BaseEdge 
-        path={edgePath} 
-        markerEnd={markerEnd} 
-        style={{ 
-          ...style, 
+      <BaseEdge
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{
+          ...style,
           stroke: selected ? '#ff6b35' : (style.stroke || '#b1b1b7'),
           strokeWidth: selected ? 3 : 2
-        }} 
+        }}
       />
-      
+
       <EdgeLabelRenderer>
         <div
           style={{
@@ -64,23 +64,23 @@ export default function FamilyEdge({
         >
           <div className={`edge-controls-container ${selected ? 'is-selected' : ''}`}>
             <div className="edge-action-menu">
-              <button 
-                className="edge-menu-btn add" 
+              <button
+                className="edge-menu-btn add"
                 onClick={(event) => {
                   event.stopPropagation();
-                  window.dispatchEvent(new CustomEvent('edge-add-person', { 
-                    detail: { sourceId: source, targetId: target, edgeId: id } 
+                  window.dispatchEvent(new CustomEvent('edge-add-person', {
+                    detail: { sourceId: source, targetId: target, edgeId: id }
                   }));
                 }}
               >
                 <Plus size={14} />
                 <span>Add More Children</span>
               </button>
-              
+
               <div className="edge-menu-divider" />
-              
-              <button 
-                className="edge-menu-btn unlink" 
+
+              <button
+                className="edge-menu-btn unlink"
                 onClick={(event) => {
                   event.stopPropagation();
                   if (window.confirm('Unlink this child?')) {

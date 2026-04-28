@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, Trash2, Camera, Upload, XCircle } from 'lucide-react';
 
 const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
   const [formData, setFormData] = useState({
@@ -110,12 +110,11 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
           </div>
 
           <div className="form-group">
-            <label>Photo URL (Optional)</label>
-            <input 
-              type="url" 
-              value={formData.imageUrl} 
-              onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
-              placeholder="https://..."
+            <label>Photo</label>
+            <ImageUploader
+              value={formData.imageUrl}
+              gender={formData.gender}
+              onChange={(val) => setFormData({ ...formData, imageUrl: val })}
             />
           </div>
 
@@ -136,5 +135,73 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
     </div>
   );
 };
+
+// ── Image Uploader Sub-component ────────────────────────────────────────────
+function ImageUploader({ value, gender, onChange }) {
+  const inputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+
+  const processFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => onChange(e.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e) => processFile(e.target.files[0]);
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    processFile(e.dataTransfer.files[0]);
+  };
+
+  return (
+    <div className="image-uploader">
+      {value ? (
+        <div className="image-preview-wrap">
+          <img src={value} alt="Preview" className="image-preview" />
+          <div className="image-preview-overlay">
+            <button
+              type="button"
+              className="img-overlay-btn"
+              onClick={() => inputRef.current.click()}
+              title="Change photo"
+            >
+              <Camera size={18} /> Change
+            </button>
+            <button
+              type="button"
+              className="img-overlay-btn remove"
+              onClick={() => onChange('')}
+              title="Remove photo"
+            >
+              <XCircle size={18} /> Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`upload-zone ${dragging ? 'dragging' : ''}`}
+          onClick={() => inputRef.current.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+        >
+          <Upload size={28} color={gender === 'female' ? '#e91e63' : '#2196f3'} />
+          <span>Click or drag &amp; drop a photo</span>
+          <small>PNG, JPG, GIF up to 5MB</small>
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+    </div>
+  );
+}
 
 export default MemberModal;

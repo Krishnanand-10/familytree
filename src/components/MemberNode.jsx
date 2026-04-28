@@ -11,7 +11,7 @@ const MemberNode = ({ data, id }) => {
       <Handle type="target" position={Position.Top} id="parent-in" style={{ background: '#555' }} />
       
       <div className="member-content">
-        <div className="member-avatar">
+        <div className={`member-avatar ${imageUrl ? 'has-photo' : ''}`}>
           {imageUrl ? (
             <img src={imageUrl} alt={name} />
           ) : (

@@ -532,3 +532,116 @@ body {
 .delete-btn:hover {
   text-decoration: underline;
 }
+
+/* ── Image Uploader ───────────────────────────────────────────────────────── */
+.image-uploader {
+  width: 100%;
+}
+
+/* Drop zone (empty state) */
+.upload-zone {
+  border: 2px dashed #ddd;
+  border-radius: 10px;
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: #fafafa;
+  color: #888;
+  font-size: 13px;
+  text-align: center;
+  user-select: none;
+}
+
+.upload-zone span {
+  font-weight: 600;
+  color: #555;
+}
+
+.upload-zone small {
+  font-size: 11px;
+  color: #bbb;
+}
+
+.upload-zone:hover,
+.upload-zone.dragging {
+  border-color: var(--primary-color);
+  background: rgba(255, 107, 53, 0.04);
+}
+
+.upload-zone.dragging {
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+/* Preview (filled state) */
+.image-preview-wrap {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #eee;
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.image-preview-wrap:hover .image-preview-overlay {
+  opacity: 1;
+}
+
+.img-overlay-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #333;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.img-overlay-btn:hover {
+  background: #f0f0f0;
+  transform: scale(1.05);
+}
+
+.img-overlay-btn.remove {
+  color: #e91e63;
+}
+
+.img-overlay-btn.remove:hover {
+  background: #fce4ec;
+}
+
+/* ── Member card: bigger avatar when photo is present ─────────────────────── */
+.member-avatar.has-photo {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  border: 2px solid #eee;
+}
