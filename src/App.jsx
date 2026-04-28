@@ -41,19 +41,23 @@ function FlowApp() {
     return localStorage.getItem('family-tree-name') || 'My Family Tree';
   });
 
-  // Start with empty arrays if nothing is saved
+  // ── Load from localStorage (with version guard to clear stale saves) ───────
+  const DATA_VERSION = '3'; // bump this whenever the schema changes
+  const savedVersion = localStorage.getItem('family-tree-version');
+  if (savedVersion !== DATA_VERSION) {
+    // Wipe old incompatible data so initialNodes/Edges are used as defaults
+    localStorage.removeItem('family-tree-nodes');
+    localStorage.removeItem('family-tree-edges');
+    localStorage.setItem('family-tree-version', DATA_VERSION);
+  }
+
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
     const saved = localStorage.getItem('family-tree-nodes');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : initialNodes;
   });
   const [edges, setEdges, onEdgesChange] = useEdgesState(() => {
     const saved = localStorage.getItem('family-tree-edges');
-    const parsed = saved ? JSON.parse(saved) : [];
-    // Migration: ensure all old edges use the new 'deletable' type
-    return parsed.map(edge => ({
-      ...edge,
-      type: (edge.type === 'smoothstep' || !edge.type) ? 'deletable' : edge.type
-    }));
+    return saved ? JSON.parse(saved) : initialEdges;
   });
 
   // Undo/Redo History
@@ -235,13 +239,12 @@ function FlowApp() {
     }
   }, [nodes, edges, findMarriageJunction, setNodes, setEdges, takeSnapshot]);
 
-  // Run cleanup once on load to fix any messy existing lines
+  // Run cleanup once after mount — empty dep array so it only fires once
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const timer = setTimeout(() => {
-      cleanupTree();
-    }, 1000);
+    const timer = setTimeout(cleanupTree, 800);
     return () => clearTimeout(timer);
-  }, []);
+  }, []); // intentionally empty — runs once on mount only
 
   const onConnect = useCallback(
     (params) => {
@@ -304,25 +307,27 @@ function FlowApp() {
         })
       );
     } else {
-      const newId = Date.now().toString();
+      // Generate a stable unique ID (timestamp + random suffix to avoid collisions)
+      const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const parentNode = nodes.find((n) => n.id === modalState.activeMemberId);
 
       let x, y;
 
       if (parentNode) {
+        // Offset from parent position in flow-space (no viewport conversion needed)
         x = parentNode.position.x;
         y = parentNode.position.y;
-        if (modalState.relativeType === 'child') y += 220;
-        if (modalState.relativeType === 'spouse') x += 200;
-        if (modalState.relativeType === 'parent') y -= 220;
+        if (modalState.relativeType === 'child')  { x += 0;   y += 240; }
+        if (modalState.relativeType === 'spouse') { x += 220; y += 0;   }
+        if (modalState.relativeType === 'parent') { x += 0;   y -= 240; }
       } else {
-        // Place new root node at center of current visible viewport
+        // No parent: place at current viewport center
         const center = screenToFlowPosition({
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
         });
-        x = center.x - 65;
-        y = center.y - 60;
+        x = center.x - 80;
+        y = center.y - 90;
       }
 
       const newNode = {
@@ -333,29 +338,38 @@ function FlowApp() {
       };
 
       if (parentNode && modalState.relativeType === 'spouse') {
-        const junctionId = `j-${parentNode.id}-${newId}`;
+        // Deduplicate junction id based on sorted member ids
+        const [idA, idB] = [parentNode.id, newId].sort();
+        const junctionId = `j-${idA}-${idB}`;
+        const junctionX = (parentNode.position.x + x) / 2 + 80;  // center between both cards
         const junctionNode = {
           id: junctionId,
           type: 'junction',
-          position: {
-            x: (parentNode.position.x + x + 220) / 2,
-            y: parentNode.position.y + 110
-          },
+          position: { x: junctionX, y: parentNode.position.y + 120 },
           data: {}
         };
 
-        setNodes((nds) => nds.concat(newNode, junctionNode));
+        setNodes((nds) => {
+          // Guard: don't add junction if one already exists with same id
+          const junctionExists = nds.some(n => n.id === junctionId);
+          return junctionExists ? nds.concat(newNode) : nds.concat(newNode, junctionNode);
+        });
         setEdges((eds) => {
           // Remove any direct marriage edge if it exists
           const filtered = eds.filter(e => !(
             (e.source === parentNode.id && e.target === newId) ||
             (e.source === newId && e.target === parentNode.id)
           ));
-          return filtered.concat([
-            { id: `e-${parentNode.id}-${junctionId}`, source: parentNode.id, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-left', type: 'marriage' },
-            { id: `e-${newId}-${junctionId}`, source: newId, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-right', type: 'marriage' }
-          ]);
+          // Guard: don't add duplicate edges
+          const edgeAId = `e-${parentNode.id}-${junctionId}`;
+          const edgeBId = `e-${newId}-${junctionId}`;
+          const toAdd = [
+            !filtered.some(e => e.id === edgeAId) && { id: edgeAId, source: parentNode.id, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-left', type: 'marriage' },
+            !filtered.some(e => e.id === edgeBId) && { id: edgeBId, source: newId, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-right', type: 'marriage' },
+          ].filter(Boolean);
+          return filtered.concat(toAdd);
         });
+
       } else if (parentNode && modalState.relativeType === 'child') {
         const isJunction = parentNode.type === 'junction';
         const junctionId = isJunction ? parentNode.id : findMarriageJunction(parentNode.id);
@@ -363,32 +377,56 @@ function FlowApp() {
         setNodes((nds) => nds.concat(newNode));
 
         if (junctionId) {
-          setEdges((eds) => eds.concat({
-            id: `e-${junctionId}-${newId}`,
-            source: junctionId,
-            target: newId,
-            sourceHandle: 'child-out',
-            targetHandle: 'parent-in',
-            type: 'family'
-          }));
+          setEdges((eds) => {
+            const edgeId = `e-${junctionId}-${newId}`;
+            if (eds.some(e => e.id === edgeId)) return eds; // dedupe
+            return eds.concat({
+              id: edgeId,
+              source: junctionId,
+              target: newId,
+              sourceHandle: 'child-out',
+              targetHandle: 'parent-in',
+              type: 'family'
+            });
+          });
         } else {
-          setEdges((eds) => eds.concat({
-            id: `e-${parentNode.id}-${newId}`,
-            source: parentNode.id,
-            target: newId,
+          setEdges((eds) => {
+            const edgeId = `e-${parentNode.id}-${newId}`;
+            if (eds.some(e => e.id === edgeId)) return eds; // dedupe
+            return eds.concat({
+              id: edgeId,
+              source: parentNode.id,
+              target: newId,
+              sourceHandle: 'child-out',
+              targetHandle: 'parent-in',
+              type: 'deletable'
+            });
+          });
+        }
+
+      } else if (parentNode && modalState.relativeType === 'parent') {
+        // Add parent above the current node
+        setNodes((nds) => nds.concat(newNode));
+        setEdges((eds) => {
+          const edgeId = `e-${newId}-${parentNode.id}`;
+          if (eds.some(e => e.id === edgeId)) return eds;
+          return eds.concat({
+            id: edgeId,
+            source: newId,
+            target: parentNode.id,
             sourceHandle: 'child-out',
             targetHandle: 'parent-in',
             type: 'deletable'
-          }));
-        }
+          });
+        });
 
       } else {
         setNodes((nds) => nds.concat(newNode));
       }
     }
     setModalState({ isOpen: false, mode: 'add', activeMemberId: null, relativeType: null });
-    // Always pan/zoom to show the new or edited node
-    setTimeout(() => fitView({ duration: 400, padding: 0.3 }), 50);
+    // Fit view to show context without jarring full-tree zoom
+    setTimeout(() => fitView({ duration: 500, padding: 0.25 }), 80);
   };
 
   const onNodeDragStop = useCallback(() => {
