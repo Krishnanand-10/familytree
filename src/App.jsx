@@ -42,7 +42,7 @@ function FlowApp() {
   });
 
   // ── Load from localStorage (with version guard to clear stale saves) ───────
-  const DATA_VERSION = '3'; // bump this whenever the schema changes
+  const DATA_VERSION = '4'; // bump this whenever the schema changes
   const savedVersion = localStorage.getItem('family-tree-version');
   if (savedVersion !== DATA_VERSION) {
     // Wipe old incompatible data so initialNodes/Edges are used as defaults
@@ -193,13 +193,14 @@ function FlowApp() {
 
           // Check if already exists in our local list to avoid duplicates in this loop
           if (!newNodes.find(n => n.id === junctionId)) {
+            // Center X = midpoint of both card centers (card width = 160px, junction width = 12px)
+            const jX = (parentA.position.x + parentB.position.x) / 2 + 80 - 6;
+            // Y = below both cards (~155px tall) with a small gap
+            const jY = Math.max(parentA.position.y, parentB.position.y) + 170;
             newNodes.push({
               id: junctionId,
               type: 'junction',
-              position: {
-                x: (parentA.position.x + parentB.position.x + 220) / 2,
-                y: parentA.position.y + 130
-              },
+              position: { x: jX, y: jY },
               data: {}
             });
 
@@ -341,11 +342,14 @@ function FlowApp() {
         // Deduplicate junction id based on sorted member ids
         const [idA, idB] = [parentNode.id, newId].sort();
         const junctionId = `j-${idA}-${idB}`;
-        const junctionX = (parentNode.position.x + x) / 2 + 80;  // center between both cards
+        // Center the junction between both card centers (card width = 160px, junction = 12px)
+        const junctionX = (parentNode.position.x + x) / 2 + 80 - 6;
+        // Place below both cards (~155px tall) + small gap
+        const junctionY = Math.max(parentNode.position.y, y) + 170;
         const junctionNode = {
           id: junctionId,
           type: 'junction',
-          position: { x: junctionX, y: parentNode.position.y + 120 },
+          position: { x: junctionX, y: junctionY },
           data: {}
         };
 
