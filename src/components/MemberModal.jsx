@@ -12,7 +12,7 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
   });
 
   useEffect(() => {
-    if (member) {
+    if (isOpen && mode === 'edit' && member) {
       setFormData({
         name: member.data.name || '',
         birthYear: member.data.birthYear || '',
@@ -21,7 +21,7 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         imageUrl: member.data.imageUrl || '',
         isAlive: member.data.isAlive !== undefined ? member.data.isAlive : !member.data.deathYear
       });
-    } else {
+    } else if (isOpen && mode === 'add') {
       setFormData({
         name: '',
         birthYear: '',
@@ -31,7 +31,7 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         isAlive: true
       });
     }
-  }, [member, isOpen]);
+  }, [member, isOpen, mode]);
 
   if (!isOpen) return null;
 

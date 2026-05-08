@@ -4,11 +4,11 @@ Kinship is a high-end, full-stack family tree visualization platform. It feature
 
 ## ✨ Core Features
 - **Interactive Canvas**: Infinite zoomable/pannable workspace.
-- **Circular Portraits**: Elegant circular nodes for family members.
-- **Relationship Persistence**: Drag-to-connect parents and children.
-- **Position Memory**: Members stay exactly where you place them.
-- **Spouse Indicators**: Visual heart markers for marriages.
-- **Profile Sidebar**: Detailed biographical management for every member.
+- **Symmetric Junctions**: Automated marriage junction nodes that center perfectly between spouses.
+- **Auto-Alignment**: Sibling children are automatically aligned and spaced in a single row.
+- **Relationship Persistence**: Drag-to-connect parents and children with "Comb" and "L" routing.
+- **Shared Stem Logic**: Clean, single-line connections from parents to multiple children.
+- **Position Memory**: Members and junctions stay exactly where you place them (or auto-snap to center).
 
 ## 🚀 Tech Stack
 - **Frontend**: React (Vite), React Flow, Framer Motion, Lucide Icons.

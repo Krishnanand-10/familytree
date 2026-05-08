@@ -16,18 +16,15 @@ export default function FamilyEdge({
   markerEnd,
   selected,
 }) {
-  // Set to 0 to make the marriage line and sibling line the same
-  const junctionDrop = 0;
-
-  // Create a "Comb" path: Down -> Horizontal -> Down
+  // The source handle is already at the bottom of the junction stem.
+  // We just need to go horizontal to the child's X, then down to the child's Y.
   const edgePath = `M ${sourceX} ${sourceY} 
-                    L ${sourceX} ${sourceY + junctionDrop} 
-                    L ${targetX} ${sourceY + junctionDrop} 
+                    L ${targetX} ${sourceY} 
                     L ${targetX} ${targetY}`;
 
-  // Calculate label position (on the horizontal bar)
+  // Calculate label position (on the horizontal segment)
   const labelX = (sourceX + targetX) / 2;
-  const labelY = sourceY + junctionDrop;
+  const labelY = sourceY;
 
   return (
     <>

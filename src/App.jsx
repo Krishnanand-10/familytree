@@ -41,16 +41,6 @@ function FlowApp() {
     return localStorage.getItem('family-tree-name') || 'My Family Tree';
   });
 
-  // ── Load from localStorage (with version guard to clear stale saves) ───────
-  const DATA_VERSION = '4'; // bump this whenever the schema changes
-  const savedVersion = localStorage.getItem('family-tree-version');
-  if (savedVersion !== DATA_VERSION) {
-    // Wipe old incompatible data so initialNodes/Edges are used as defaults
-    localStorage.removeItem('family-tree-nodes');
-    localStorage.removeItem('family-tree-edges');
-    localStorage.setItem('family-tree-version', DATA_VERSION);
-  }
-
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
     const saved = localStorage.getItem('family-tree-nodes');
     return saved ? JSON.parse(saved) : initialNodes;
@@ -59,6 +49,12 @@ function FlowApp() {
     const saved = localStorage.getItem('family-tree-edges');
     return saved ? JSON.parse(saved) : initialEdges;
   });
+
+  // Track latest nodes/edges for cleanup logic to avoid stale closures
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
 
   // Undo/Redo History
   const [history, setHistory] = useState([]);
@@ -168,35 +164,53 @@ function FlowApp() {
   }, [nodes, edges]);
 
   // Cleanup and migrate old edges to junctions
+
   const cleanupTree = useCallback(() => {
     let hasChanged = false;
-    let newEdges = [...edges];
-    let newNodes = [...nodes];
+    let newEdges = [...edgesRef.current];
+    let newNodes = [...nodesRef.current];
+
+    // 0. Ensure existing junctions are perfectly centered between parents
+    newNodes = newNodes.map(node => {
+      if (node.type === 'junction') {
+        const parentEdges = newEdges.filter(e => e.target === node.id && e.type === 'marriage');
+        if (parentEdges.length === 2) {
+          const pA = newNodes.find(n => n.id === parentEdges[0].source);
+          const pB = newNodes.find(n => n.id === parentEdges[1].source);
+          if (pA && pB) {
+            const targetX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 6);
+            const targetY = Math.round(Math.max(pA.position.y, pB.position.y) + 200); // 200px gap for clarity
+            if (Math.abs(node.position.x - targetX) > 1 || Math.abs(node.position.y - targetY) > 1) {
+              hasChanged = true;
+              return { ...node, position: { x: targetX, y: targetY } };
+            }
+          }
+        }
+      }
+      return node;
+    });
 
     // 1. Create junctions for married pairs who don't have one
-    const members = nodes.filter(n => n.type === 'member');
+    const members = newNodes.filter(n => n.type === 'member');
     for (const parentA of members) {
       // Find a spouse (connected via 'Married' label or 'spouse-out' handle)
       const spouseEdge = newEdges.find(e =>
         (e.source === parentA.id || e.target === parentA.id) &&
         (e.label === 'Married' || e.sourceHandle === 'spouse-out') &&
-        nodes.find(n => n.id === (e.source === parentA.id ? e.target : e.source))?.type === 'member'
+        newNodes.find(n => n.id === (e.source === parentA.id ? e.target : e.source))?.type === 'member'
       );
 
       if (spouseEdge) {
         const parentBId = spouseEdge.source === parentA.id ? spouseEdge.target : spouseEdge.source;
-        const parentB = nodes.find(n => n.id === parentBId);
+        const parentB = newNodes.find(n => n.id === parentBId);
 
         // Only create if neither has a junction already
         if (parentB && !findMarriageJunction(parentA.id) && !findMarriageJunction(parentBId)) {
           const junctionId = `j-${parentA.id}-${parentBId}`;
 
-          // Check if already exists in our local list to avoid duplicates in this loop
           if (!newNodes.find(n => n.id === junctionId)) {
-            // Center X = midpoint of both card centers (card width = 160px, junction width = 12px)
             const jX = (parentA.position.x + parentB.position.x) / 2 + 80 - 6;
-            // Y = below both cards (~155px tall) with a small gap
-            const jY = Math.max(parentA.position.y, parentB.position.y) + 170;
+            const jY = Math.max(parentA.position.y, parentB.position.y) + 200;
             newNodes.push({
               id: junctionId,
               type: 'junction',
@@ -216,21 +230,66 @@ function FlowApp() {
       }
     }
 
-    // 2. Migrate direct parent-child edges to junctions if they exist
+    // 2. Migrate direct parent-child edges to junctions
     newEdges = newEdges.map(edge => {
-      const parent = nodes.find(n => n.id === edge.source);
-      if (parent && parent.type === 'member' && edge.targetHandle === 'parent-in' && edge.sourceHandle === 'child-out') {
-        const junctionId = findMarriageJunction(parent.id);
-        if (junctionId && edge.source !== junctionId) {
-          hasChanged = true;
-          return { ...edge, source: junctionId, type: 'family' };
+      const targetNode = newNodes.find(n => n.id === edge.target);
+      if (targetNode?.type === 'member' && (edge.targetHandle === 'parent-in' || edge.sourceHandle === 'child-out')) {
+        let finalSource = edge.source;
+        const parent = newNodes.find(n => n.id === edge.source);
+        
+        if (parent && parent.type === 'member') {
+          const junctionId = findMarriageJunction(parent.id);
+          if (junctionId) {
+            finalSource = junctionId;
+          }
         }
-        if (junctionId && edge.type !== 'family') {
+        
+        if (edge.source !== finalSource || edge.type !== 'family') {
           hasChanged = true;
-          return { ...edge, type: 'family' };
+          return { ...edge, source: finalSource, type: 'family' };
         }
       }
       return edge;
+    });
+
+    // 3. Auto-align sibling children
+    const childrenByParent = {};
+    newEdges.forEach(e => {
+      if (e.sourceHandle === 'child-out' || e.targetHandle === 'parent-in') {
+        if (!childrenByParent[e.source]) childrenByParent[e.source] = [];
+        childrenByParent[e.source].push(e.target);
+      }
+    });
+
+    Object.entries(childrenByParent).forEach(([parentId, childIds]) => {
+      if (childIds.length > 1) {
+        const siblingNodes = childIds.map(id => newNodes.find(n => n.id === id)).filter(Boolean);
+        if (siblingNodes.length === 0) return;
+
+        let maxY = 0;
+        siblingNodes.forEach(node => { if (node.position.y > maxY) maxY = node.position.y; });
+
+        siblingNodes.sort((a, b) => a.position.x - b.position.x);
+        const spacing = 220;
+        const parentNode = newNodes.find(n => n.id === parentId);
+        
+        let centerX = 0;
+        if (parentNode) {
+          centerX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
+        }
+
+        const startX = centerX - ((siblingNodes.length - 1) * spacing) / 2;
+
+        siblingNodes.forEach((node, i) => {
+          const targetX = Math.round(startX + i * spacing - 80); 
+          const targetY = Math.round(maxY);
+          if (Math.abs(node.position.x - targetX) > 1 || Math.abs(node.position.y - targetY) > 1) {
+            const nodeIndex = newNodes.findIndex(n => n.id === node.id);
+            newNodes[nodeIndex] = { ...newNodes[nodeIndex], position: { x: targetX, y: targetY } };
+            hasChanged = true;
+          }
+        });
+      }
     });
 
     if (hasChanged) {
@@ -238,7 +297,7 @@ function FlowApp() {
       setEdges(newEdges);
       takeSnapshot();
     }
-  }, [nodes, edges, findMarriageJunction, setNodes, setEdges, takeSnapshot]);
+  }, [findMarriageJunction, setNodes, setEdges, takeSnapshot]);
 
   // Run cleanup once after mount — empty dep array so it only fires once
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -250,9 +309,14 @@ function FlowApp() {
   const onConnect = useCallback(
     (params) => {
       takeSnapshot();
-      setEdges((eds) => addEdge({ ...params, type: 'deletable' }, eds));
+      let type = 'deletable';
+      if (params.sourceHandle === 'child-out' || params.targetHandle === 'parent-in') {
+        type = 'family';
+      }
+      setEdges((eds) => addEdge({ ...params, type }, eds));
+      setTimeout(cleanupTree, 50); // Convert direct marriage to junctions, auto-align children
     },
-    [setEdges, takeSnapshot],
+    [setEdges, takeSnapshot, cleanupTree],
   );
 
   const handleAddRelative = useCallback((memberId, type) => {
@@ -318,9 +382,9 @@ function FlowApp() {
         // Offset from parent position in flow-space (no viewport conversion needed)
         x = parentNode.position.x;
         y = parentNode.position.y;
-        if (modalState.relativeType === 'child')  { x += 0;   y += 240; }
+        if (modalState.relativeType === 'child')  { x += 0;   y += 270; }
         if (modalState.relativeType === 'spouse') { x += 220; y += 0;   }
-        if (modalState.relativeType === 'parent') { x += 0;   y -= 240; }
+        if (modalState.relativeType === 'parent') { x += 0;   y -= 270; }
       } else {
         // No parent: place at current viewport center
         const center = screenToFlowPosition({
@@ -343,9 +407,9 @@ function FlowApp() {
         const [idA, idB] = [parentNode.id, newId].sort();
         const junctionId = `j-${idA}-${idB}`;
         // Center the junction between both card centers (card width = 160px, junction = 12px)
-        const junctionX = (parentNode.position.x + x) / 2 + 80 - 6;
+        const junctionX = Math.round((parentNode.position.x + x) / 2 + 80 - 6);
         // Place below both cards (~155px tall) + small gap
-        const junctionY = Math.max(parentNode.position.y, y) + 170;
+        const junctionY = Math.round(Math.max(parentNode.position.y, y) + 200);
         const junctionNode = {
           id: junctionId,
           type: 'junction',
@@ -429,8 +493,7 @@ function FlowApp() {
       }
     }
     setModalState({ isOpen: false, mode: 'add', activeMemberId: null, relativeType: null });
-    // Fit view to show context without jarring full-tree zoom
-    setTimeout(() => fitView({ duration: 500, padding: 0.25 }), 80);
+    setTimeout(cleanupTree, 100);
   };
 
   const onNodeDragStop = useCallback(() => {
