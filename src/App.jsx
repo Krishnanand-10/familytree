@@ -38,10 +38,13 @@ const edgeTypes = {
 
 // Inner component that can use useReactFlow()
 function FlowApp() {
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
   const [treeName, setTreeName] = useState(() => {
     return localStorage.getItem('family-tree-name') || 'My Family Tree';
   });
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
     const saved = localStorage.getItem('family-tree-nodes');
@@ -139,6 +142,25 @@ function FlowApp() {
     window.addEventListener('edge-add-person', handleEdgeAdd);
     return () => window.removeEventListener('edge-add-person', handleEdgeAdd);
   }, [edges]);
+
+  // Handle Search
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const filtered = nodes.filter(node => 
+      node.type === 'member' && 
+      node.data.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setSearchResults(filtered);
+  }, [searchQuery, nodes]);
+
+  const handleSelectSearchResult = (node) => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setCenter(node.position.x + 80, node.position.y + 90, { zoom: 1.2, duration: 800 });
+  };
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -601,9 +623,32 @@ function FlowApp() {
           <button className="action-btn"><LayoutGrid size={18} /></button>
         </div>
         <div style={{ borderLeft: '1px solid #ddd', height: '24px', margin: '0 10px' }}></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f5f5f5', padding: '4px 12px', borderRadius: '20px' }}>
-          <Search size={16} color="#666" />
-          <input type="text" placeholder="Find a person..." style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }} />
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f5f5f5', padding: '4px 12px', borderRadius: '20px' }}>
+            <Search size={16} color="#666" />
+            <input 
+              type="text" 
+              placeholder="Find a person..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }} 
+            />
+          </div>
+          
+          {searchResults.length > 0 && (
+            <div className="search-results-dropdown">
+              {searchResults.map(node => (
+                <div 
+                  key={node.id} 
+                  className="search-result-item"
+                  onClick={() => handleSelectSearchResult(node)}
+                >
+                  <div className="search-result-name">{node.data.name}</div>
+                  <div className="search-result-meta">{node.data.birthYear || 'Unknown'}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <button className="action-btn"><Settings size={18} /></button>
         <button className="action-btn"><HelpCircle size={18} /></button>
