@@ -36,18 +36,18 @@ const JunctionNode = () => {
         zIndex: -1,
       }} />
 
-      {/* Parents arrive from left & right */}
-      <Handle type="target" position={Position.Left}   id="parent-left"  style={{ opacity: 0, left: -1 }} />
-      <Handle type="target" position={Position.Right}  id="parent-right" style={{ opacity: 0, right: -1 }} />
+      {/* Parents arrive from left & right — centered to eliminate gaps */}
+      <Handle type="target" position={Position.Left}   id="parent-left"  style={{ opacity: 0, left: 6, top: 6 }} />
+      <Handle type="target" position={Position.Right}  id="parent-right" style={{ opacity: 0, right: 6, top: 6 }} />
       {/* Parent-only (single-parent) arrives from top */}
-      <Handle type="target" position={Position.Top}    id="parent-in"   style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Top}    id="parent-in"   style={{ opacity: 0, left: 6, top: 6 }} />
       
       {/* Children drop from the bottom of the shared stem (30px down from center) */}
       <Handle 
         type="source" 
         position={Position.Bottom} 
         id="child-out" 
-        style={{ opacity: 0, bottom: -24 }} // 30px total drop from center - 6px radius
+        style={{ opacity: 0, left: 6, bottom: -24 }} 
       />
     </div>
   );
