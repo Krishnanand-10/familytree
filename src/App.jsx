@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -17,6 +17,7 @@ import MemberModal from './components/MemberModal';
 import DeletableEdge from './components/DeletableEdge';
 import FamilyEdge from './components/FamilyEdge';
 import MarriageEdge from './components/MarriageEdge';
+import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
 import { Search, Settings, Share2, Users, LayoutGrid, HelpCircle, Save, Plus } from 'lucide-react';
@@ -32,6 +33,7 @@ const edgeTypes = {
   smoothstep: DeletableEdge,
   family: FamilyEdge,
   marriage: MarriageEdge,
+  spouse: SpouseEdge,
 };
 
 // Inner component that can use useReactFlow()
@@ -170,92 +172,151 @@ function FlowApp() {
     let newEdges = [...edgesRef.current];
     let newNodes = [...nodesRef.current];
 
-    // 0. Ensure existing junctions are perfectly centered between parents
-    newNodes = newNodes.map(node => {
+    // 1. Identify all married pairs (either via junction or direct spouse edge)
+    const pairs = [];
+    
+    // Find pairs from junctions
+    newNodes.forEach(node => {
       if (node.type === 'junction') {
         const parentEdges = newEdges.filter(e => e.target === node.id && e.type === 'marriage');
         if (parentEdges.length === 2) {
-          const pA = newNodes.find(n => n.id === parentEdges[0].source);
-          const pB = newNodes.find(n => n.id === parentEdges[1].source);
-          if (pA && pB) {
-            const targetX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 6);
-            const targetY = Math.round(Math.max(pA.position.y, pB.position.y) + 200); // 200px gap for clarity
-            if (Math.abs(node.position.x - targetX) > 1 || Math.abs(node.position.y - targetY) > 1) {
-              hasChanged = true;
-              return { ...node, position: { x: targetX, y: targetY } };
+          pairs.push({
+            parentAId: parentEdges[0].source,
+            parentBId: parentEdges[1].source,
+            junctionId: node.id
+          });
+        }
+      }
+    });
+
+    // Find pairs from direct spouse edges
+    newEdges.forEach(edge => {
+      if (edge.type === 'spouse') {
+        if (!pairs.some(p => (p.parentAId === edge.source && p.parentBId === edge.target) || (p.parentAId === edge.target && p.parentBId === edge.source))) {
+          pairs.push({
+            parentAId: edge.source,
+            parentBId: edge.target,
+            junctionId: null
+          });
+        }
+      }
+    });
+
+    // NEW: Find pairs from shared children (useful when parents r added from a child card)
+    newNodes.forEach(node => {
+      if (node.type === 'member') {
+        const parentEdges = newEdges.filter(e => e.target === node.id && (e.type === 'family' || e.type === 'deletable'));
+        if (parentEdges.length === 2) {
+          const pAId = parentEdges[0].source;
+          const pBId = parentEdges[1].source;
+          const pA = newNodes.find(n => n.id === pAId);
+          const pB = newNodes.find(n => n.id === pBId);
+          
+          if (pA?.type === 'member' && pB?.type === 'member') {
+            if (!pairs.some(p => (p.parentAId === pAId && p.parentBId === pBId) || (p.parentAId === pBId && p.parentBId === pAId))) {
+              pairs.push({
+                parentAId: pAId,
+                parentBId: pBId,
+                junctionId: null
+              });
             }
           }
         }
       }
-      return node;
     });
 
-    // 1. Create junctions for married pairs who don't have one
-    const members = newNodes.filter(n => n.type === 'member');
-    for (const parentA of members) {
-      // Find a spouse (connected via 'Married' label or 'spouse-out' handle)
-      const spouseEdge = newEdges.find(e =>
-        (e.source === parentA.id || e.target === parentA.id) &&
-        (e.label === 'Married' || e.sourceHandle === 'spouse-out') &&
-        newNodes.find(n => n.id === (e.source === parentA.id ? e.target : e.source))?.type === 'member'
+    // 2. For each pair, decide if we need a junction or a direct link
+    pairs.forEach(pair => {
+      // Find children connected to either parent OR the junction
+      const childEdges = newEdges.filter(e => 
+        (e.source === pair.junctionId || e.source === pair.parentAId || e.source === pair.parentBId) && 
+        (e.type === 'family' || e.targetHandle === 'parent-in')
       );
+      const hasChildren = childEdges.length > 0;
 
-      if (spouseEdge) {
-        const parentBId = spouseEdge.source === parentA.id ? spouseEdge.target : spouseEdge.source;
-        const parentB = newNodes.find(n => n.id === parentBId);
-
-        // Only create if neither has a junction already
-        if (parentB && !findMarriageJunction(parentA.id) && !findMarriageJunction(parentBId)) {
-          const junctionId = `j-${parentA.id}-${parentBId}`;
-
+      if (hasChildren && !pair.junctionId) {
+        // Need to CREATE a junction
+        const pA = newNodes.find(n => n.id === pair.parentAId);
+        const pB = newNodes.find(n => n.id === pair.parentBId);
+        if (pA && pB) {
+          const junctionId = `j-${pA.id}-${pB.id}`;
+          const jX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 6);
+          const jY = Math.round(Math.max(pA.position.y, pB.position.y) + 200);
+          
           if (!newNodes.find(n => n.id === junctionId)) {
-            const jX = (parentA.position.x + parentB.position.x) / 2 + 80 - 6;
-            const jY = Math.max(parentA.position.y, parentB.position.y) + 200;
             newNodes.push({
               id: junctionId,
               type: 'junction',
               position: { x: jX, y: jY },
               data: {}
             });
+            hasChanged = true;
+          }
 
-            newEdges.push(
-              { id: `e-${parentA.id}-${junctionId}`, source: parentA.id, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-left', type: 'marriage' },
-              { id: `e-${parentBId}-${junctionId}`, source: parentBId, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-right', type: 'marriage' }
-            );
+          // Replace direct spouse edge with marriage edges
+          newEdges = newEdges.filter(e => !((e.source === pA.id && e.target === pB.id) || (e.source === pB.id && e.target === pA.id)));
+          
+          if (!newEdges.find(e => e.id === `e-${pA.id}-${junctionId}`)) {
+            newEdges.push({ id: `e-${pA.id}-${junctionId}`, source: pA.id, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-left', type: 'marriage' });
+            hasChanged = true;
+          }
+          if (!newEdges.find(e => e.id === `e-${pB.id}-${junctionId}`)) {
+            newEdges.push({ id: `e-${pB.id}-${junctionId}`, source: pB.id, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-right', type: 'marriage' });
+            hasChanged = true;
+          }
 
-            newEdges = newEdges.filter(e => e.id !== spouseEdge.id);
+          // Re-route children to the new junction and remove duplicates
+          const seenChildren = new Set();
+          newEdges = newEdges.filter(e => {
+            if (childEdges.some(ce => ce.id === e.id)) {
+              if (seenChildren.has(e.target)) return false; // Remove redundant parent-to-child lines
+              seenChildren.add(e.target);
+              e.source = junctionId;
+              e.type = 'family';
+              e.sourceHandle = 'child-out';
+              hasChanged = true;
+            }
+            return true;
+          });
+        }
+      } else if (!hasChildren && pair.junctionId) {
+        // Need to REMOVE the junction and replace with direct spouse link
+        newNodes = newNodes.filter(n => n.id !== pair.junctionId);
+        newEdges = newEdges.filter(e => e.target !== pair.junctionId && e.source !== pair.junctionId);
+        
+        const edgeId = `s-${pair.parentAId}-${pair.parentBId}`;
+        if (!newEdges.find(e => e.id === edgeId)) {
+          newEdges.push({
+            id: edgeId,
+            source: pair.parentAId,
+            target: pair.parentBId,
+            sourceHandle: 'spouse-out',
+            targetHandle: 'spouse-in',
+            type: 'spouse'
+          });
+        }
+        hasChanged = true;
+      } else if (hasChildren && pair.junctionId) {
+        // Ensure junction is centered
+        const pA = newNodes.find(n => n.id === pair.parentAId);
+        const pB = newNodes.find(n => n.id === pair.parentBId);
+        const node = newNodes.find(n => n.id === pair.junctionId);
+        if (pA && pB && node) {
+          const targetX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 6);
+          const targetY = Math.round(Math.max(pA.position.y, pB.position.y) + 200);
+          if (Math.abs(node.position.x - targetX) > 1 || Math.abs(node.position.y - targetY) > 1) {
+            const idx = newNodes.findIndex(n => n.id === node.id);
+            newNodes[idx] = { ...node, position: { x: targetX, y: targetY } };
             hasChanged = true;
           }
         }
       }
-    }
-
-    // 2. Migrate direct parent-child edges to junctions
-    newEdges = newEdges.map(edge => {
-      const targetNode = newNodes.find(n => n.id === edge.target);
-      if (targetNode?.type === 'member' && (edge.targetHandle === 'parent-in' || edge.sourceHandle === 'child-out')) {
-        let finalSource = edge.source;
-        const parent = newNodes.find(n => n.id === edge.source);
-        
-        if (parent && parent.type === 'member') {
-          const junctionId = findMarriageJunction(parent.id);
-          if (junctionId) {
-            finalSource = junctionId;
-          }
-        }
-        
-        if (edge.source !== finalSource || edge.type !== 'family') {
-          hasChanged = true;
-          return { ...edge, source: finalSource, type: 'family' };
-        }
-      }
-      return edge;
     });
 
-    // 3. Auto-align sibling children
+    // 3. Auto-align sibling children (same as before)
     const childrenByParent = {};
     newEdges.forEach(e => {
-      if (e.sourceHandle === 'child-out' || e.targetHandle === 'parent-in') {
+      if (e.type === 'family') {
         if (!childrenByParent[e.source]) childrenByParent[e.source] = [];
         childrenByParent[e.source].push(e.target);
       }
@@ -297,7 +358,7 @@ function FlowApp() {
       setEdges(newEdges);
       takeSnapshot();
     }
-  }, [findMarriageJunction, setNodes, setEdges, takeSnapshot]);
+  }, [setNodes, setEdges, takeSnapshot]);
 
   // Run cleanup once after mount — empty dep array so it only fires once
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,11 +371,13 @@ function FlowApp() {
     (params) => {
       takeSnapshot();
       let type = 'deletable';
-      if (params.sourceHandle === 'child-out' || params.targetHandle === 'parent-in') {
+      if (params.sourceHandle === 'spouse-out' || params.targetHandle === 'spouse-in') {
+        type = 'spouse';
+      } else if (params.sourceHandle === 'child-out' || params.targetHandle === 'parent-in') {
         type = 'family';
       }
       setEdges((eds) => addEdge({ ...params, type }, eds));
-      setTimeout(cleanupTree, 50); // Convert direct marriage to junctions, auto-align children
+      setTimeout(cleanupTree, 50); 
     },
     [setEdges, takeSnapshot, cleanupTree],
   );
@@ -403,51 +466,30 @@ function FlowApp() {
       };
 
       if (parentNode && modalState.relativeType === 'spouse') {
-        // Deduplicate junction id based on sorted member ids
-        const [idA, idB] = [parentNode.id, newId].sort();
-        const junctionId = `j-${idA}-${idB}`;
-        // Center the junction between both card centers (card width = 160px, junction = 12px)
-        const junctionX = Math.round((parentNode.position.x + x) / 2 + 80 - 6);
-        // Place below both cards (~155px tall) + small gap
-        const junctionY = Math.round(Math.max(parentNode.position.y, y) + 200);
-        const junctionNode = {
-          id: junctionId,
-          type: 'junction',
-          position: { x: junctionX, y: junctionY },
-          data: {}
-        };
-
-        setNodes((nds) => {
-          // Guard: don't add junction if one already exists with same id
-          const junctionExists = nds.some(n => n.id === junctionId);
-          return junctionExists ? nds.concat(newNode) : nds.concat(newNode, junctionNode);
-        });
+        setNodes((nds) => nds.concat(newNode));
         setEdges((eds) => {
-          // Remove any direct marriage edge if it exists
-          const filtered = eds.filter(e => !(
-            (e.source === parentNode.id && e.target === newId) ||
-            (e.source === newId && e.target === parentNode.id)
-          ));
-          // Guard: don't add duplicate edges
-          const edgeAId = `e-${parentNode.id}-${junctionId}`;
-          const edgeBId = `e-${newId}-${junctionId}`;
-          const toAdd = [
-            !filtered.some(e => e.id === edgeAId) && { id: edgeAId, source: parentNode.id, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-left', type: 'marriage' },
-            !filtered.some(e => e.id === edgeBId) && { id: edgeBId, source: newId, target: junctionId, sourceHandle: 'child-out', targetHandle: 'parent-right', type: 'marriage' },
-          ].filter(Boolean);
-          return filtered.concat(toAdd);
+          const edgeId = `s-${parentNode.id}-${newId}`;
+          if (eds.some(e => e.id === edgeId)) return eds;
+          return eds.concat({
+            id: edgeId,
+            source: parentNode.id,
+            target: newId,
+            sourceHandle: 'spouse-out',
+            targetHandle: 'spouse-in',
+            type: 'spouse'
+          });
         });
 
       } else if (parentNode && modalState.relativeType === 'child') {
         const isJunction = parentNode.type === 'junction';
-        const junctionId = isJunction ? parentNode.id : findMarriageJunction(parentNode.id);
+        let junctionId = isJunction ? parentNode.id : findMarriageJunction(parentNode.id);
 
         setNodes((nds) => nds.concat(newNode));
 
         if (junctionId) {
           setEdges((eds) => {
             const edgeId = `e-${junctionId}-${newId}`;
-            if (eds.some(e => e.id === edgeId)) return eds; // dedupe
+            if (eds.some(e => e.id === edgeId)) return eds;
             return eds.concat({
               id: edgeId,
               source: junctionId,
@@ -458,16 +500,18 @@ function FlowApp() {
             });
           });
         } else {
+          // If no junction, but parent has a spouse, we should ideally find the spouse edge.
+          // But for now, we'll just connect to parent directly and let cleanup handle it.
           setEdges((eds) => {
             const edgeId = `e-${parentNode.id}-${newId}`;
-            if (eds.some(e => e.id === edgeId)) return eds; // dedupe
+            if (eds.some(e => e.id === edgeId)) return eds;
             return eds.concat({
               id: edgeId,
               source: parentNode.id,
               target: newId,
               sourceHandle: 'child-out',
               targetHandle: 'parent-in',
-              type: 'deletable'
+              type: 'family'
             });
           });
         }
