@@ -306,7 +306,7 @@ function FlowApp() {
         const pB = newNodes.find(n => n.id === pair.parentBId);
         const node = newNodes.find(n => n.id === pair.junctionId);
         if (pA && pB && node) {
-          const targetX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 6);
+          const targetX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 10);
           const targetY = Math.round(Math.max(pA.position.y, pB.position.y) + 200);
           if (Math.abs(node.position.x - targetX) > 1 || Math.abs(node.position.y - targetY) > 1) {
             const idx = newNodes.findIndex(n => n.id === node.id);
@@ -428,6 +428,12 @@ function FlowApp() {
       return edge ? (edge.source === memberId ? edge.target : edge.source) : null;
     };
 
+    const getSpouseLocal = (id, eds) => {
+      const edge = eds.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
+      if (!edge) return null;
+      return edge.source === id ? edge.target : edge.source;
+    };
+
     const levels = {};
     const calculateLevels = () => {
       const nodesToProcess = newNodes.filter(n => n.type === 'member');
@@ -514,10 +520,24 @@ function FlowApp() {
       Object.entries(groups).forEach(([parentId, ids]) => {
         const parentNode = newNodes.find(n => n.id === parentId);
         if (parentNode && parentId !== 'root') {
-          // Try to center group under parent
-          const groupWidth = ids.length * horizontalSpacing;
+          // Calculate true group width including spouses
+          let totalGroupWidth = 0;
+          const spouseProcessed = new Set();
+          ids.forEach(id => {
+            if (spouseProcessed.has(id)) return;
+            const spouseId = getSpouseLocal(id, newEdges);
+            if (spouseId) {
+              totalGroupWidth += horizontalSpacing + 220;
+              spouseProcessed.add(id);
+              spouseProcessed.add(spouseId);
+            } else {
+              totalGroupWidth += horizontalSpacing;
+            }
+          });
+          totalGroupWidth -= horizontalSpacing; // Adjust for the last gap/width
+
           const parentCenterX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
-          currentX = parentCenterX - groupWidth / 2;
+          currentX = parentCenterX - (totalGroupWidth / 2) - 80;
         }
 
         ids.forEach(id => {
@@ -550,7 +570,7 @@ function FlowApp() {
           const pA = newNodes.find(n => n.id === mEdges[0].source);
           const pB = newNodes.find(n => n.id === mEdges[1].source);
           if (pA && pB) {
-            node.position = { x: (pA.position.x + pB.position.x) / 2 + 80 - 6, y: Math.max(pA.position.y, pB.position.y) + 220 };
+            node.position = { x: (pA.position.x + pB.position.x) / 2 + 80 - 10, y: Math.max(pA.position.y, pB.position.y) + 220 };
           }
         }
       }
