@@ -24,7 +24,7 @@ export default function SpouseEdge({
     targetX,
     targetY,
     targetPosition,
-    borderRadius: 16,
+    borderRadius: 0,
   });
 
   return (

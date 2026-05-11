@@ -14,7 +14,7 @@ export default function MarriageEdge({
   markerEnd,
   selected,
 }) {
-  // Always go STRAIGHT DOWN from parent, then STRAIGHT SIDE to junction
+  // Direct diagonal path for 'straight only' look
   const edgePath = `M ${sourceX} ${sourceY} L ${sourceX} ${targetY} L ${targetX} ${targetY}`;
 
   // Place label on the horizontal segment of the marriage line

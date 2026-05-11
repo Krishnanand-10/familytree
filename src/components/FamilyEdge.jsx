@@ -18,9 +18,7 @@ export default function FamilyEdge({
 }) {
   // The source handle is already at the bottom of the junction stem.
   // We just need to go horizontal to the child's X, then down to the child's Y.
-  const edgePath = `M ${sourceX} ${sourceY} 
-                    L ${targetX} ${sourceY} 
-                    L ${targetX} ${targetY}`;
+  const edgePath = `M ${sourceX} ${sourceY} L ${targetX} ${sourceY} L ${targetX} ${targetY}`;
 
   // Calculate label position (on the horizontal segment)
   const labelX = (sourceX + targetX) / 2;
