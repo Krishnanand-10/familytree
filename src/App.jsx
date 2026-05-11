@@ -313,6 +313,28 @@ function FlowApp() {
             newNodes[idx] = { ...node, position: { x: targetX, y: targetY } };
             hasChanged = true;
           }
+
+          // REDIRECT any direct children to the junction
+          const directEdges = newEdges.filter(e => 
+            (e.source === pair.parentAId || e.source === pair.parentBId) && 
+            (e.type === 'family' || e.type === 'deletable' || e.targetHandle === 'parent-in') &&
+            e.target !== pair.junctionId
+          );
+          
+          if (directEdges.length > 0) {
+            newEdges = newEdges.map(e => {
+              if (directEdges.some(de => de.id === e.id)) {
+                return {
+                  ...e,
+                  source: pair.junctionId,
+                  type: 'family',
+                  sourceHandle: 'child-out'
+                };
+              }
+              return e;
+            });
+            hasChanged = true;
+          }
         }
       }
     });
