@@ -12,14 +12,14 @@ const JunctionNode = () => {
   return (
     <div className="junction-node-container" style={{
       width: 20,
-      height: 20,
+      height: 50,
       position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
     }}>
       {/* The central junction dot */}
       <div className="junction-dot" style={{
+        position: 'absolute',
+        top: 3,
+        left: 3,
         width: 14,
         height: 14,
         borderRadius: '50%',
@@ -35,7 +35,7 @@ const JunctionNode = () => {
         top: 10,
         left: 9,
         width: 2,
-        height: 35,
+        height: 28,
         background: 'var(--edge-color)',
         opacity: 0.6,
         zIndex: -1,
@@ -50,7 +50,7 @@ const JunctionNode = () => {
         type="source" 
         position={Position.Bottom} 
         id="child-out" 
-        style={{ width: 24, height: 24, opacity: 0, top: 10, left: 10, transform: 'translate(-50%, -50%)' }} 
+        style={{ width: 40, height: 1, opacity: 0, top: 40, left: 10, transform: 'translateX(-50%)' }} 
       />
     </div>
   );
