@@ -428,21 +428,14 @@ function FlowApp() {
       return edge ? (edge.source === memberId ? edge.target : edge.source) : null;
     };
 
-    // 1. Identify generational levels
     const levels = {};
-    
-    // Assign levels based on path from "top-level" ancestors
     const calculateLevels = () => {
       const nodesToProcess = newNodes.filter(n => n.type === 'member');
       let changed = true;
-      
-      // Initialize roots
       nodesToProcess.forEach(n => {
         const hasParent = newEdges.some(e => e.target === n.id && (e.type === 'family' || e.type === 'deletable'));
         if (!hasParent) levels[n.id] = 0;
       });
-
-      // Iteratively push children down
       while (changed) {
         changed = false;
         newEdges.forEach(edge => {
@@ -457,8 +450,6 @@ function FlowApp() {
             }
           }
         });
-        
-        // Sync spouses
         newEdges.forEach(edge => {
           if (edge.type === 'spouse') {
             if (levels[edge.source] !== undefined && levels[edge.target] === undefined) {
@@ -472,10 +463,7 @@ function FlowApp() {
         });
       }
     };
-
     calculateLevels();
-    
-    // Ensure junctions sit between levels
     newNodes.forEach(node => {
       if (node.type === 'junction') {
         const parentEdges = newEdges.filter(e => e.target === node.id && e.type === 'marriage');
@@ -486,11 +474,8 @@ function FlowApp() {
       }
     });
 
-    newNodes.forEach(n => { if (levels[n.id] === undefined) levels[n.id] = 0; });
-
-    // 2. Arrange by Level
-    const levelHeight = 300;
-    const horizontalSpacing = 300;
+    const levelHeight = 320;
+    const horizontalSpacing = 240;
     const nodesByLevel = {};
     Object.entries(levels).forEach(([id, level]) => {
       if (Math.floor(level) === level) {
@@ -505,6 +490,9 @@ function FlowApp() {
     Object.entries(nodesByLevel).forEach(([level, nodeIds]) => {
       const y = parseInt(level) * levelHeight;
       const sortedIds = [...nodeIds].sort((a, b) => {
+        const pA = newEdges.find(e => e.target === a && (e.type === 'family' || e.type === 'deletable'))?.source || 'root';
+        const pB = newEdges.find(e => e.target === b && (e.type === 'family' || e.type === 'deletable'))?.source || 'root';
+        if (pA !== pB) return pA.localeCompare(pB);
         const nodeA = newNodes.find(n => n.id === a);
         const nodeB = newNodes.find(n => n.id === b);
         const yearA = parseInt(nodeA?.data?.birthYear) || 0;
@@ -512,36 +500,49 @@ function FlowApp() {
         return yearA - yearB;
       });
 
+      // Group by parent
+      const groups = {};
+      sortedIds.forEach(id => {
+        const parentId = newEdges.find(e => e.target === id && (e.type === 'family' || e.type === 'deletable'))?.source || 'root';
+        if (!groups[parentId]) groups[parentId] = [];
+        groups[parentId].push(id);
+      });
+
       let currentX = -(sortedIds.length * horizontalSpacing) / 2;
       const processed = new Set();
-
-      sortedIds.forEach(id => {
-        if (processed.has(id)) return;
-        const node = newNodes.find(n => n.id === id);
-        if (!node) return;
-
-        const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
-        const spouseId = spouseEdge ? (spouseEdge.source === id ? spouseEdge.target : spouseEdge.source) : null;
-        
-        const idx = newNodes.findIndex(n => n.id === id);
-        newNodes[idx] = { ...node, position: { x: currentX, y } };
-        processed.add(id);
-
-        if (spouseId) {
-          const sNode = newNodes.find(n => n.id === spouseId);
-          if (sNode) {
-            const sIdx = newNodes.findIndex(n => n.id === spouseId);
-            newNodes[sIdx] = { ...sNode, position: { x: currentX + 220, y } };
-            processed.add(spouseId);
-            currentX += horizontalSpacing + 220;
-          }
-        } else {
-          currentX += horizontalSpacing;
+      
+      Object.entries(groups).forEach(([parentId, ids]) => {
+        const parentNode = newNodes.find(n => n.id === parentId);
+        if (parentNode && parentId !== 'root') {
+          // Try to center group under parent
+          const groupWidth = ids.length * horizontalSpacing;
+          const parentCenterX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
+          currentX = parentCenterX - groupWidth / 2;
         }
+
+        ids.forEach(id => {
+          if (processed.has(id)) return;
+          const node = newNodes.find(n => n.id === id);
+          if (!node) return;
+          const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
+          const spouseId = spouseEdge ? (spouseEdge.source === id ? spouseEdge.target : spouseEdge.source) : null;
+          newNodes[newNodes.findIndex(n => n.id === id)] = { ...node, position: { x: currentX, y } };
+          processed.add(id);
+          if (spouseId) {
+            const sNode = newNodes.find(n => n.id === spouseId);
+            if (sNode) {
+              newNodes[newNodes.findIndex(n => n.id === spouseId)] = { ...sNode, position: { x: currentX + 220, y } };
+              processed.add(spouseId);
+              currentX += horizontalSpacing + 220;
+            }
+          } else {
+            currentX += horizontalSpacing;
+          }
+        });
+        currentX += 100; // Gap between families
       });
     });
 
-    // 3. Final Junction Snap
     newNodes.forEach(node => {
       if (node.type === 'junction') {
         const mEdges = newEdges.filter(e => e.target === node.id && e.type === 'marriage');
@@ -549,10 +550,7 @@ function FlowApp() {
           const pA = newNodes.find(n => n.id === mEdges[0].source);
           const pB = newNodes.find(n => n.id === mEdges[1].source);
           if (pA && pB) {
-            node.position = {
-              x: (pA.position.x + pB.position.x) / 2 + 80 - 6,
-              y: Math.max(pA.position.y, pB.position.y) + 220
-            };
+            node.position = { x: (pA.position.x + pB.position.x) / 2 + 80 - 6, y: Math.max(pA.position.y, pB.position.y) + 220 };
           }
         }
       }
