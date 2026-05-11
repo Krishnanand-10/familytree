@@ -327,60 +327,63 @@ function FlowApp() {
     });
 
     Object.entries(childrenByParent).forEach(([parentId, childIds]) => {
-      if (childIds.length > 1) {
-        const siblingNodes = childIds.map(id => newNodes.find(n => n.id === id)).filter(Boolean);
-        if (siblingNodes.length === 0) return;
+      const siblingNodes = childIds.map(id => newNodes.find(n => n.id === id)).filter(Boolean);
+      if (siblingNodes.length === 0) return;
 
-        let maxY = 0;
-        siblingNodes.forEach(node => { if (node.position.y > maxY) maxY = node.position.y; });
+      // Determine the target Y for this row of siblings
+      const parentNode = newNodes.find(n => n.id === parentId);
+      let targetY = 0;
+      let centerX = 0;
+      
+      if (parentNode) {
+        centerX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
+        // If parent is a junction, children should be exactly 80px below the junction branching point
+        // If parent is a member, children should be 280px below (standard generation height)
+        targetY = parentNode.position.y + (parentNode.type === 'junction' ? 80 : 300);
+      } else {
+        // Fallback to maxY if no parent found (shouldn't happen)
+        siblingNodes.forEach(node => { if (node.position.y > targetY) targetY = node.position.y; });
+      }
 
-        siblingNodes.sort((a, b) => a.position.x - b.position.x);
+      siblingNodes.sort((a, b) => a.position.x - b.position.x);
+      
+      const siblingUnits = siblingNodes.map(node => {
+        const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === node.id || e.target === node.id));
+        const isMarried = !!spouseEdge;
+        return {
+          id: node.id,
+          width: isMarried ? 400 : 180,
+          node: node,
+          spouseId: spouseEdge ? (spouseEdge.source === node.id ? spouseEdge.target : spouseEdge.source) : null
+        };
+      });
+
+      const totalWidth = siblingUnits.reduce((acc, unit) => acc + unit.width, 0);
+      let currentX = centerX - totalWidth / 2;
+
+      siblingUnits.forEach((unit) => {
+        const currentTargetX = Math.round(currentX + (unit.width === 400 ? 0 : 10));
         
-        const parentNode = newNodes.find(n => n.id === parentId);
-        let centerX = 0;
-        if (parentNode) {
-          centerX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
+        if (Math.abs(unit.node.position.x - currentTargetX) > 1 || Math.abs(unit.node.position.y - targetY) > 1) {
+          const nodeIndex = newNodes.findIndex(n => n.id === unit.id);
+          newNodes[nodeIndex] = { ...newNodes[nodeIndex], position: { x: currentTargetX, y: targetY } };
+          hasChanged = true;
         }
 
-        const siblingUnits = siblingNodes.map(node => {
-          const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === node.id || e.target === node.id));
-          const isMarried = !!spouseEdge;
-          return {
-            id: node.id,
-            width: isMarried ? 400 : 180,
-            node: node,
-            spouseId: spouseEdge ? (spouseEdge.source === node.id ? spouseEdge.target : spouseEdge.source) : null
-          };
-        });
-
-        const totalWidth = siblingUnits.reduce((acc, unit) => acc + unit.width, 0);
-        let currentX = centerX - totalWidth / 2;
-
-        siblingUnits.forEach((unit) => {
-          const targetX = Math.round(currentX + (unit.width === 400 ? 0 : 10));
-          const targetY = Math.round(maxY);
-          
-          if (Math.abs(unit.node.position.x - targetX) > 1 || Math.abs(unit.node.position.y - targetY) > 1) {
-            const nodeIndex = newNodes.findIndex(n => n.id === unit.id);
-            newNodes[nodeIndex] = { ...newNodes[nodeIndex], position: { x: targetX, y: targetY } };
-            hasChanged = true;
-          }
-
-          if (unit.spouseId) {
-            const spouseNode = newNodes.find(n => n.id === unit.spouseId);
-            if (spouseNode) {
-              const sTargetX = targetX + 220;
-              if (Math.abs(spouseNode.position.x - sTargetX) > 1 || Math.abs(spouseNode.position.y - targetY) > 1) {
-                const sIdx = newNodes.findIndex(n => n.id === spouseNode.id);
-                newNodes[sIdx] = { ...spouseNode, position: { x: sTargetX, y: targetY } };
-                hasChanged = true;
-              }
+        if (unit.spouseId) {
+          const spouseNode = newNodes.find(n => n.id === unit.spouseId);
+          if (spouseNode) {
+            const sTargetX = currentTargetX + 220;
+            if (Math.abs(spouseNode.position.x - sTargetX) > 1 || Math.abs(spouseNode.position.y - targetY) > 1) {
+              const sIdx = newNodes.findIndex(n => n.id === spouseNode.id);
+              newNodes[sIdx] = { ...spouseNode, position: { x: sTargetX, y: targetY } };
+              hasChanged = true;
             }
           }
+        }
 
-          currentX += unit.width;
-        });
-      }
+        currentX += unit.width;
+      });
     });
 
     if (hasChanged) {

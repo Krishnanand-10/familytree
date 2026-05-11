@@ -10,44 +10,47 @@ import { Handle, Position } from '@xyflow/react';
  */
 const JunctionNode = () => {
   return (
-    <div style={{
-      width: 12,
-      height: 12,
+    <div className="junction-node-container" style={{
+      width: 20,
+      height: 20,
       position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
       {/* The central junction dot */}
-      <div style={{
-        width: 12,
-        height: 12,
+      <div className="junction-dot" style={{
+        width: 14,
+        height: 14,
         borderRadius: '50%',
-        background: 'var(--edge-color)',
-        opacity: 0.5,
+        background: 'var(--primary-color)',
+        border: '2px solid white',
+        boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+        zIndex: 10,
       }} />
 
-      {/* The shared stem — ensures only one vertical line comes from the junction */}
+      {/* The shared stem */}
       <div style={{
         position: 'absolute',
-        top: 6, // center of dot
-        left: 5, // centered horizontally (12/2 - 1/2)
+        top: 10,
+        left: 9,
         width: 2,
-        height: 30,
+        height: 35,
         background: 'var(--edge-color)',
-        opacity: 0.8,
+        opacity: 0.6,
         zIndex: -1,
       }} />
 
-      {/* Parents arrive from left & right — centered to eliminate gaps */}
-      <Handle type="target" position={Position.Left}   id="parent-left"  style={{ opacity: 0, left: 6, top: 6 }} />
-      <Handle type="target" position={Position.Right}  id="parent-right" style={{ opacity: 0, right: 6, top: 6 }} />
-      {/* Parent-only (single-parent) arrives from top */}
-      <Handle type="target" position={Position.Top}    id="parent-in"   style={{ opacity: 0, left: 6, top: 6 }} />
+      {/* Connection Handles - Larger hit area */}
+      <Handle type="target" position={Position.Left}   id="parent-left"  style={{ width: 12, height: 12, opacity: 0, left: 10, top: 10 }} />
+      <Handle type="target" position={Position.Right}  id="parent-right" style={{ width: 12, height: 12, opacity: 0, right: 10, top: 10 }} />
+      <Handle type="target" position={Position.Top}    id="parent-in"    style={{ width: 12, height: 12, opacity: 0, left: 10, top: 10 }} />
       
-      {/* Children drop from the bottom of the shared stem (30px down from center) */}
       <Handle 
         type="source" 
         position={Position.Bottom} 
         id="child-out" 
-        style={{ opacity: 0, left: 6, bottom: -24 }} 
+        style={{ width: 24, height: 24, opacity: 0, top: 10, left: 10, transform: 'translate(-50%, -50%)' }} 
       />
     </div>
   );
