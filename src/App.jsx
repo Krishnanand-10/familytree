@@ -20,7 +20,7 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Settings, Share2, Users, LayoutGrid, HelpCircle, Save, Plus, Wand2 } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2 } from 'lucide-react';
 
 const nodeTypes = {
   member: MemberNode,
@@ -782,66 +782,40 @@ function FlowApp() {
 
   return (
     <>
-      <header className="navbar">
-        <div className="navbar-left">
-          <div className="logo">
-            <div className="logo-icon">M</div>
-            MyHeritage
+      <header className="k-header">
+        <div className="k-header-left">
+          <div className="k-logo">
+            <div className="k-logo-icon">
+              <TreePine size={18} />
+            </div>
+            <span className="k-logo-text">Kinship</span>
           </div>
-          <nav className="nav-links">
-            <a href="#" className="nav-link">Home</a>
-            <a href="#" className="nav-link active">Family tree</a>
-            <a href="#" className="nav-link">Discoveries</a>
-            <a href="#" className="nav-link">Photos</a>
-            <a href="#" className="nav-link">DNA</a>
-            <a href="#" className="nav-link">Research</a>
-          </nav>
-        </div>
-        <div className="navbar-right" style={{ display: 'flex', gap: '10px' }}>
-          <button className="action-btn" onClick={handleClearTree} title="Clear Tree" style={{ color: '#e91e63' }}>
-            Reset
-          </button>
-          <button className="save-btn" style={{ padding: '6px 12px', fontSize: '13px' }}>
-            <Save size={14} /> Save Tree
-          </button>
-        </div>
-      </header>
 
-      <div className="toolbar">
-        <input
-          className="tree-title"
-          value={treeName}
-          onChange={(e) => setTreeName(e.target.value)}
-          style={{ border: 'none', background: 'transparent', width: 'auto', minWidth: '150px', outline: 'none', cursor: 'pointer' }}
-          placeholder="Enter Tree Name..."
-        />
-        <div style={{ flex: 1 }}></div>
-        <div className="nav-links" style={{ gap: '10px' }}>
-          <button className="action-btn" onClick={rearrangeEverything} title="Magic Align - Fix overlaps and center generations">
-            <Wand2 size={18} /> Magic Align
-          </button>
-          <button className="action-btn" title="Family View"><Users size={18} /> Family view</button>
-          <button className="action-btn"><Share2 size={18} /></button>
-          <button className="action-btn"><LayoutGrid size={18} /></button>
+          <div className="k-divider-v" />
+
+          <input
+            className="k-tree-name"
+            value={treeName}
+            onChange={(e) => setTreeName(e.target.value)}
+            placeholder="Untitled Tree"
+          />
         </div>
-        <div style={{ borderLeft: '1px solid #ddd', height: '24px', margin: '0 10px' }}></div>
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f5f5f5', padding: '4px 12px', borderRadius: '20px' }}>
-            <Search size={16} color="#666" />
-            <input 
-              type="text" 
-              placeholder="Find a person..." 
+
+        <div className="k-header-center">
+          <div className="k-search-box">
+            <Search size={15} />
+            <input
+              type="text"
+              placeholder="Search people…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }} 
             />
           </div>
-          
           {searchResults.length > 0 && (
             <div className="search-results-dropdown">
               {searchResults.map(node => (
-                <div 
-                  key={node.id} 
+                <div
+                  key={node.id}
                   className="search-result-item"
                   onClick={() => handleSelectSearchResult(node)}
                 >
@@ -852,9 +826,34 @@ function FlowApp() {
             </div>
           )}
         </div>
-        <button className="action-btn"><Settings size={18} /></button>
-        <button className="action-btn"><HelpCircle size={18} /></button>
-      </div>
+
+        <div className="k-header-right">
+          <button className="k-tool-btn" onClick={undo} title="Undo (Ctrl+Z)" disabled={history.length === 0}>
+            <Undo2 size={16} />
+          </button>
+          <button className="k-tool-btn" onClick={redo} title="Redo (Ctrl+Y)" disabled={redoStack.length === 0}>
+            <Redo2 size={16} />
+          </button>
+
+          <div className="k-divider-v" />
+
+          <button className="k-tool-btn accent" onClick={rearrangeEverything} title="Magic Align">
+            <Wand2 size={16} />
+            <span>Align</span>
+          </button>
+
+          <button className="k-tool-btn danger" onClick={handleClearTree} title="Clear entire tree">
+            <Trash2 size={16} />
+          </button>
+
+          <div className="k-divider-v" />
+
+          <button className="k-save-btn">
+            <Save size={15} />
+            <span>Save</span>
+          </button>
+        </div>
+      </header>
 
       <main style={{ flex: 1, position: 'relative' }}>
         <ReactFlow
@@ -875,12 +874,11 @@ function FlowApp() {
         </ReactFlow>
 
         <button
-          className="save-btn"
-          style={{ position: 'absolute', bottom: '20px', right: '20px', borderRadius: '50%', width: '50px', height: '50px', padding: 0, justifyContent: 'center', zIndex: 10 }}
+          className="k-fab"
           onClick={() => setModalState({ isOpen: true, mode: 'add', activeMemberId: null, relativeType: null })}
-          title="Add Starting Person"
+          title="Add a New Person"
         >
-          <Plus size={24} />
+          <Plus size={22} />
         </button>
       </main>
 
