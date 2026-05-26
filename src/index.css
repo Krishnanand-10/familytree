@@ -255,6 +255,38 @@ body {
   transform: scale(0.96);
 }
 
+/* ── Save Toast ──────────────────────────────────────────────────────────── */
+.k-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1a1a2e;
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 9999;
+}
+
+.k-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.k-toast svg {
+  color: #4ade80;
+}
+
 /* React Flow Customizations */
 .react-flow__background {
   background-color: var(--bg-color);

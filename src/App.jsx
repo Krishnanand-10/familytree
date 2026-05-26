@@ -20,7 +20,7 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2 } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check } from 'lucide-react';
 
 const nodeTypes = {
   member: MemberNode,
@@ -45,6 +45,7 @@ function FlowApp() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [showSaveToast, setShowSaveToast] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
     const saved = localStorage.getItem('family-tree-nodes');
@@ -54,6 +55,15 @@ function FlowApp() {
     const saved = localStorage.getItem('family-tree-edges');
     return saved ? JSON.parse(saved) : initialEdges;
   });
+
+  const handleSaveClick = useCallback(() => {
+    // localStorage already auto-saves, but this gives user a visual confirmation
+    localStorage.setItem('family-tree-nodes', JSON.stringify(nodes));
+    localStorage.setItem('family-tree-edges', JSON.stringify(edges));
+    localStorage.setItem('family-tree-name', treeName);
+    setShowSaveToast(true);
+    setTimeout(() => setShowSaveToast(false), 2000);
+  }, [nodes, edges, treeName]);
 
   // Track latest nodes/edges for cleanup logic to avoid stale closures
   const nodesRef = useRef(nodes);
@@ -848,7 +858,7 @@ function FlowApp() {
 
           <div className="k-divider-v" />
 
-          <button className="k-save-btn">
+          <button className="k-save-btn" onClick={handleSaveClick}>
             <Save size={15} />
             <span>Save</span>
           </button>
@@ -890,6 +900,12 @@ function FlowApp() {
         onSave={handleSaveMember}
         onDelete={handleDelete}
       />
+
+      {/* Save Toast */}
+      <div className={`k-toast ${showSaveToast ? 'visible' : ''}`}>
+        <Check size={16} />
+        <span>Tree saved successfully</span>
+      </div>
       </>
   );
 }

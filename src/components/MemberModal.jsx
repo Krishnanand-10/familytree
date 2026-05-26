@@ -8,7 +8,8 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
     deathYear: '',
     gender: 'male',
     imageUrl: '',
-    isAlive: true
+    isAlive: true,
+    notes: ''
   });
 
   useEffect(() => {
@@ -19,7 +20,8 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         deathYear: member.data.deathYear || '',
         gender: member.data.gender || 'male',
         imageUrl: member.data.imageUrl || '',
-        isAlive: member.data.isAlive !== undefined ? member.data.isAlive : !member.data.deathYear
+        isAlive: member.data.isAlive !== undefined ? member.data.isAlive : !member.data.deathYear,
+        notes: member.data.notes || ''
       });
     } else if (isOpen && mode === 'add') {
       setFormData({
@@ -28,7 +30,8 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         deathYear: '',
         gender: 'male',
         imageUrl: '',
-        isAlive: true
+        isAlive: true,
+        notes: ''
       });
     }
   }, [member, isOpen, mode]);
@@ -115,6 +118,28 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
               value={formData.imageUrl}
               gender={formData.gender}
               onChange={(val) => setFormData({ ...formData, imageUrl: val })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Add a short bio, memories, or any notes…"
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+              onBlur={(e) => e.target.style.borderColor = '#ddd'}
             />
           </div>
 
