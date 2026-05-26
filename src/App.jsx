@@ -20,7 +20,7 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload } from 'lucide-react';
 
 const nodeTypes = {
   member: MemberNode,
@@ -68,6 +68,7 @@ function FlowApp() {
   // Track latest nodes/edges for cleanup logic to avoid stale closures
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+  const fileInputRef = useRef(null);
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
   useEffect(() => { edgesRef.current = edges; }, [edges]);
 
@@ -649,7 +650,62 @@ function FlowApp() {
       localStorage.removeItem('family-tree-edges');
     }
   };
+  const handleExportTree = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(
+      JSON.stringify({
+        version: "1.0",
+        name: treeName,
+        nodes: nodes,
+        edges: edges
+      }, null, 2)
+    );
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href",     dataStr);
+    downloadAnchor.setAttribute("download", `${treeName.replace(/\s+/g, '_')}_backup.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportTree = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (!data.nodes || !data.edges) {
+          alert("Invalid backup file: 'nodes' or 'edges' data is missing.");
+          return;
+        }
+        
+        if (window.confirm("Importing this backup will overwrite your current family tree. Continue?")) {
+          takeSnapshot();
+          if (data.name) {
+            setTreeName(data.name);
+            localStorage.setItem('family-tree-name', data.name);
+          }
+          setNodes(data.nodes);
+          setEdges(data.edges);
+          localStorage.setItem('family-tree-nodes', JSON.stringify(data.nodes));
+          localStorage.setItem('family-tree-edges', JSON.stringify(data.edges));
+          
+          // Show toast
+          setShowSaveToast(true);
+          setTimeout(() => setShowSaveToast(false), 2000);
+        }
+      } catch (err) {
+        alert("Failed to parse JSON backup file: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset file input
+  };
 
   const handleSaveMember = (formData) => {
     takeSnapshot();
@@ -854,6 +910,21 @@ function FlowApp() {
 
           <button className="k-tool-btn danger" onClick={handleClearTree} title="Clear entire tree">
             <Trash2 size={16} />
+          </button>
+
+          <button className="k-tool-btn" onClick={handleExportTree} title="Export Backup (JSON)">
+            <Download size={16} />
+          </button>
+
+          <button className="k-tool-btn" onClick={handleImportClick} title="Import Backup (JSON)">
+            <Upload size={16} />
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept=".json"
+              onChange={handleImportTree}
+            />
           </button>
 
           <div className="k-divider-v" />
