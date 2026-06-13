@@ -1,4 +1,3 @@
-import React from 'react';
 import { EdgeLabelRenderer, BaseEdge } from '@xyflow/react';
 import { X, Plus } from 'lucide-react';
 
@@ -10,8 +9,6 @@ export default function FamilyEdge({
   sourceY,
   targetX,
   targetY,
-  sourcePosition,
-  targetPosition,
   style = {},
   markerEnd,
   selected,

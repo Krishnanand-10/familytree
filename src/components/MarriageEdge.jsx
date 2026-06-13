@@ -1,11 +1,8 @@
-import React from 'react';
 import { EdgeLabelRenderer, BaseEdge } from '@xyflow/react';
 import { X } from 'lucide-react';
 
 export default function MarriageEdge({
   id,
-  source,
-  target,
   sourceX,
   sourceY,
   targetX,

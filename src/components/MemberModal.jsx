@@ -1,20 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { X, Save, Trash2, Camera, Upload, XCircle } from 'lucide-react';
 
 const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    birthYear: '',
-    deathYear: '',
-    gender: 'male',
-    imageUrl: '',
-    isAlive: true,
-    notes: ''
-  });
-
-  useEffect(() => {
-    if (isOpen && mode === 'edit' && member) {
-      setFormData({
+  const [formData, setFormData] = useState(() => {
+    if (mode === 'edit' && member) {
+      return {
         name: member.data.name || '',
         birthYear: member.data.birthYear || '',
         deathYear: member.data.deathYear || '',
@@ -22,19 +12,18 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         imageUrl: member.data.imageUrl || '',
         isAlive: member.data.isAlive !== undefined ? member.data.isAlive : !member.data.deathYear,
         notes: member.data.notes || ''
-      });
-    } else if (isOpen && mode === 'add') {
-      setFormData({
-        name: '',
-        birthYear: '',
-        deathYear: '',
-        gender: 'male',
-        imageUrl: '',
-        isAlive: true,
-        notes: ''
-      });
+      };
     }
-  }, [member, isOpen, mode]);
+    return {
+      name: '',
+      birthYear: '',
+      deathYear: '',
+      gender: 'male',
+      imageUrl: '',
+      isAlive: true,
+      notes: ''
+    };
+  });
 
   if (!isOpen) return null;
 

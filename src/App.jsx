@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -44,7 +44,6 @@ function FlowApp() {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
   const [showSaveToast, setShowSaveToast] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
@@ -133,7 +132,7 @@ function FlowApp() {
   // Handle adding person from edge
   useEffect(() => {
     const handleEdgeAdd = (event) => {
-      const { sourceId, targetId, edgeId } = event.detail;
+      const { sourceId, edgeId } = event.detail;
       const edge = edges.find(e => e.id === edgeId);
       if (!edge) return;
 
@@ -155,21 +154,16 @@ function FlowApp() {
   }, [edges]);
 
   // Handle Search
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    const filtered = nodes.filter(node => 
+  const searchResults = useMemo(() => {
+    if (searchQuery.length < 2) return [];
+    return nodes.filter(node => 
       node.type === 'member' && 
       node.data.name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    setSearchResults(filtered);
   }, [searchQuery, nodes]);
 
   const handleSelectSearchResult = (node) => {
     setSearchQuery('');
-    setSearchResults([]);
     setCenter(node.position.x + 80, node.position.y + 90, { zoom: 1.2, duration: 800 });
   };
 
@@ -431,14 +425,6 @@ function FlowApp() {
     const newNodes = [...nodes];
     const newEdges = [...edges];
 
-    const findJunctionLocal = (memberId, nds, eds) => {
-      const edge = eds.find(e =>
-        (e.source === memberId || e.target === memberId) &&
-        nds.find(n => n.id === (e.source === memberId ? e.target : e.source))?.type === 'junction'
-      );
-      return edge ? (edge.source === memberId ? edge.target : edge.source) : null;
-    };
-
     const getSpouseLocal = (id, eds) => {
       const edge = eds.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
       if (!edge) return null;
@@ -590,13 +576,13 @@ function FlowApp() {
     setNodes(newNodes);
     setEdges(newEdges);
     setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 100);
-  }, [nodes, edges, takeSnapshot, fitView]);
+  }, [nodes, edges, takeSnapshot, fitView, setNodes, setEdges]);
 
   // Run cleanup once after mount — empty dep array so it only fires once
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const timer = setTimeout(cleanupTree, 800);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — runs once on mount only
 
   const onConnect = useCallback(
@@ -963,14 +949,16 @@ function FlowApp() {
         </button>
       </main>
 
-      <MemberModal
-        isOpen={modalState.isOpen}
-        mode={modalState.mode}
-        member={activeMember}
-        onClose={() => setModalState({ ...modalState, isOpen: false })}
-        onSave={handleSaveMember}
-        onDelete={handleDelete}
-      />
+      {modalState.isOpen && (
+        <MemberModal
+          isOpen={modalState.isOpen}
+          mode={modalState.mode}
+          member={activeMember}
+          onClose={() => setModalState({ ...modalState, isOpen: false })}
+          onSave={handleSaveMember}
+          onDelete={handleDelete}
+        />
+      )}
 
       {/* Save Toast */}
       <div className={`k-toast ${showSaveToast ? 'visible' : ''}`}>

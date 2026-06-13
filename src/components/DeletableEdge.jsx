@@ -1,4 +1,3 @@
-import React from 'react';
 import { getSmoothStepPath, EdgeLabelRenderer, BaseEdge } from '@xyflow/react';
 import { X, Plus } from 'lucide-react';
 
@@ -17,7 +16,6 @@ export default function DeletableEdge({
   label,
   selected,
   sourceHandleId,
-  targetHandleId,
 }) {
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,

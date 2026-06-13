@@ -1,4 +1,3 @@
-import React from 'react';
 import { EdgeLabelRenderer, BaseEdge, getSmoothStepPath } from '@xyflow/react';
 import { X, Plus } from 'lucide-react';
 
