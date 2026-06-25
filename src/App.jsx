@@ -546,167 +546,222 @@ function FlowApp() {
     const newNodes = [...nodes];
     const newEdges = [...edges];
 
-    const getSpouseLocal = (id, eds) => {
-      const edge = eds.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
-      if (!edge) return null;
-      return edge.source === id ? edge.target : edge.source;
-    };
+    // --- Constants ---
+    const CARD_W = 160;           // visual card width (must match CSS)
+    const H_GAP  = 80;            // horizontal gap between siblings
+    const V_GAP  = 320;           // vertical gap between generations (needs room for junction dot)
+    const UNIT   = CARD_W + H_GAP; // slot width per single node
 
-    const isSpouseAlsoChildLocal = (spouseId, eds) => {
-      if (!spouseId) return false;
-      return eds.some(e => e.target === spouseId && (e.type === 'family' || e.type === 'deletable'));
-    };
+    // --- Helpers ---
+    const getChildren = (parentId) =>
+      newEdges
+        .filter(e => e.source === parentId && (e.type === 'family' || e.type === 'deletable'))
+        .map(e => e.target)
+        .filter(id => newNodes.find(n => n.id === id));
 
-    const levels = {};
-    const calculateLevels = () => {
-      const nodesToProcess = newNodes.filter(n => n.type === 'member');
-      let changed = true;
-      nodesToProcess.forEach(n => {
-        const hasParent = newEdges.some(e => e.target === n.id && (e.type === 'family' || e.type === 'deletable'));
-        if (!hasParent) levels[n.id] = 0;
-      });
-      while (changed) {
-        changed = false;
-        newEdges.forEach(edge => {
-          if (edge.type === 'family' || edge.type === 'deletable' || edge.type === 'marriage') {
-            const sourceLevel = levels[edge.source];
-            if (sourceLevel !== undefined) {
-              const targetLevel = Math.floor(sourceLevel) + (edge.type === 'marriage' ? 0 : 1);
-              if (levels[edge.target] === undefined || levels[edge.target] < targetLevel) {
-                levels[edge.target] = targetLevel;
-                changed = true;
-              }
-            }
-          }
-        });
-        newEdges.forEach(edge => {
-          if (edge.type === 'spouse') {
-            if (levels[edge.source] !== undefined && levels[edge.target] === undefined) {
-              levels[edge.target] = levels[edge.source];
-              changed = true;
-            } else if (levels[edge.target] !== undefined && levels[edge.source] === undefined) {
-              levels[edge.source] = levels[edge.target];
-              changed = true;
-            }
-          }
-        });
+    const getSpouseId = (id) => {
+      // 1. Direct spouse edge (before junction is created)
+      const direct = newEdges.find(e2 => e2.type === 'spouse' && (e2.source === id || e2.target === id));
+      if (direct) return direct.source === id ? direct.target : direct.source;
+
+      // 2. Via shared junction: marriage edges go FROM member TO junction
+      //    So find a junction this node feeds into, then find the OTHER member feeding that junction
+      const marriageEdge = newEdges.find(e2 => e2.type === 'marriage' && e2.source === id);
+      if (marriageEdge) {
+        const junctionId = marriageEdge.target;
+        const otherEdge = newEdges.find(e2 => e2.type === 'marriage' && e2.target === junctionId && e2.source !== id);
+        if (otherEdge) return otherEdge.source;
       }
+
+      return null;
     };
-    calculateLevels();
-    newNodes.forEach(node => {
-      if (node.type === 'junction') {
-        const parentEdges = newEdges.filter(e => e.target === node.id && e.type === 'marriage');
-        if (parentEdges.length > 0) {
-          const pLevel = levels[parentEdges[0].source] || 0;
-          levels[node.id] = pLevel + 0.5;
-        }
+
+
+    const isAlsoChild = (id) =>
+      newEdges.some(e => e.target === id && (e.type === 'family' || e.type === 'deletable'));
+
+    // Sort a list of node IDs by their current x position (preserves user's left-to-right arrangement)
+    const sortByX = (ids) =>
+      [...ids].sort((a, b) => {
+        const na = newNodes.find(n => n.id === a);
+        const nb = newNodes.find(n => n.id === b);
+        return (na?.position?.x ?? 0) - (nb?.position?.x ?? 0);
+      });
+
+    // Get all children that appear BELOW a member node (direct or via junction)
+    const getAllChildren = (nodeId) => {
+      // direct children (rare — most go through junction)
+      const direct = getChildren(nodeId);
+      // children via junction: marriage edges go FROM member TO junction
+      const junctionEdges = newEdges.filter(
+        e => e.type === 'marriage' && e.source === nodeId
+      );
+      const junctionChildren = [];
+      junctionEdges.forEach(je => {
+        getChildren(je.target).forEach(cId => {
+          if (!direct.includes(cId)) junctionChildren.push(cId);
+        });
+      });
+      const combined = [...direct, ...junctionChildren];
+      // Sort by current x so align respects user's left-to-right arrangement
+      return sortByX(combined);
+    };
+
+    // --- Find root nodes (no parent edges pointing to them) ---
+    const memberNodes = newNodes.filter(n => n.type === 'member');
+    const roots = memberNodes.filter(n => !isAlsoChild(n.id));
+
+    // If there's a married couple at the root, treat them together
+    // Build "family units" at root level: a root + its spouse (if spouse is also a root)
+    const rootIds = new Set(roots.map(n => n.id));
+    const processedRoots = new Set();
+    const rootUnits = []; // each unit is [memberId] or [memberId, spouseId]
+    roots.forEach(r => {
+      if (processedRoots.has(r.id)) return;
+      processedRoots.add(r.id);
+      const sp = getSpouseId(r.id);
+      if (sp && rootIds.has(sp) && !processedRoots.has(sp)) {
+        processedRoots.add(sp);
+        rootUnits.push([r.id, sp]);
+      } else {
+        rootUnits.push([r.id]);
       }
     });
 
-    const levelHeight = 320;
-    const horizontalSpacing = 240;
-    const nodesByLevel = {};
-    Object.entries(levels).forEach(([id, level]) => {
-      if (Math.floor(level) === level) {
-        const node = newNodes.find(n => n.id === id);
-        if (node && node.type === 'member') {
-          if (!nodesByLevel[level]) nodesByLevel[level] = [];
-          nodesByLevel[level].push(id);
+    // --- Bottom-up subtree width calculation ---
+    // subtreeWidth[nodeId] = total width needed to render this node's entire subtree
+    const subtreeWidth = {};
+
+    const calcWidth = (nodeId) => {
+      if (subtreeWidth[nodeId] !== undefined) return subtreeWidth[nodeId];
+      const children = getAllChildren(nodeId);
+      // Also include spouse width in root calculation if relevant
+      const spouseId = getSpouseId(nodeId);
+      const spouseAlsoChild = spouseId && isAlsoChild(spouseId);
+
+      if (children.length === 0) {
+        // Leaf: width is own card + spouse card if bundled
+        const w = (spouseId && !spouseAlsoChild) ? UNIT + CARD_W : CARD_W;
+        subtreeWidth[nodeId] = w;
+        return w;
+      }
+
+      // Children subtree widths
+      const childrenW = children.reduce((sum, cId) => {
+        return sum + calcWidth(cId) + H_GAP;
+      }, -H_GAP); // remove trailing gap
+
+      const myWidth = Math.max(
+        childrenW,
+        (spouseId && !spouseAlsoChild) ? UNIT + CARD_W : CARD_W
+      );
+      subtreeWidth[nodeId] = myWidth;
+      return myWidth;
+    };
+
+    roots.forEach(r => calcWidth(r.id));
+
+    // --- Top-down placement ---
+    const positioned = new Set();
+
+    const placeNode = (nodeId, centerX, y) => {
+      if (positioned.has(nodeId)) return;
+      positioned.add(nodeId);
+
+      const idx = newNodes.findIndex(n => n.id === nodeId);
+      if (idx === -1) return;
+
+      const spouseId = getSpouseId(nodeId);
+      const spouseAlsoChild = spouseId && isAlsoChild(spouseId);
+
+      // If this node has a bundled spouse (spouse is NOT also a child), place them side-by-side
+      if (spouseId && !spouseAlsoChild && !positioned.has(spouseId)) {
+        // Total pair width = 2*CARD_W + H_GAP, centered at centerX
+        // leftX = centerX - (2*CARD_W + H_GAP)/2 = centerX - CARD_W - H_GAP/2
+        const leftX  = centerX - CARD_W - H_GAP / 2;
+        const rightX = centerX + H_GAP / 2;
+        newNodes[idx] = { ...newNodes[idx], position: { x: leftX, y } };
+        const spIdx = newNodes.findIndex(n => n.id === spouseId);
+        if (spIdx !== -1) {
+          newNodes[spIdx] = { ...newNodes[spIdx], position: { x: rightX, y } };
         }
+        positioned.add(spouseId);
+      } else {
+        // Place single node centered
+        newNodes[idx] = { ...newNodes[idx], position: { x: centerX - CARD_W / 2, y } };
+      }
+
+      // Place children centered below
+      const children = getAllChildren(nodeId);
+      if (children.length === 0) return;
+
+      const childY = y + V_GAP;
+
+      // Calculate total width of all children
+      const totalChildW = children.reduce((sum, cId) => sum + subtreeWidth[cId], 0)
+        + H_GAP * (children.length - 1);
+
+      let childX = centerX - totalChildW / 2;
+      children.forEach(cId => {
+        if (positioned.has(cId)) return;
+        const cW = subtreeWidth[cId];
+        const cCenter = childX + cW / 2;
+        placeNode(cId, cCenter, childY);
+        childX += cW + H_GAP;
+      });
+    };
+
+    // Place root units
+    // Total width of all root units
+    const totalRootW = rootUnits.reduce((sum, unit) => {
+      const mainW = subtreeWidth[unit[0]] || CARD_W;
+      return sum + mainW;
+    }, 0) + H_GAP * (rootUnits.length - 1);
+
+    let rootX = -totalRootW / 2;
+    rootUnits.forEach(unit => {
+      const mainId = unit[0];
+      const mainW = subtreeWidth[mainId] || CARD_W;
+      const centerX = rootX + mainW / 2;
+      placeNode(mainId, centerX, 0);
+      rootX += mainW + H_GAP;
+    });
+
+    // --- Place any unpositioned members (disconnected nodes) ---
+    let floatX = 0;
+    newNodes.forEach((node, i) => {
+      if (node.type === 'member' && !positioned.has(node.id)) {
+        newNodes[i] = { ...node, position: { x: floatX, y: -300 } };
+        floatX += UNIT;
       }
     });
 
-    Object.entries(nodesByLevel).forEach(([level, nodeIds]) => {
-      const y = parseInt(level) * levelHeight;
-      const sortedIds = [...nodeIds].sort((a, b) => {
-        const pA = newEdges.find(e => e.target === a && (e.type === 'family' || e.type === 'deletable'))?.source || 'root';
-        const pB = newEdges.find(e => e.target === b && (e.type === 'family' || e.type === 'deletable'))?.source || 'root';
-        if (pA !== pB) return pA.localeCompare(pB);
-        const nodeA = newNodes.find(n => n.id === a);
-        const nodeB = newNodes.find(n => n.id === b);
-        const yearA = parseInt(nodeA?.data?.birthYear) || 0;
-        const yearB = parseInt(nodeB?.data?.birthYear) || 0;
-        return yearA - yearB;
-      });
-
-      // Group by parent
-      const groups = {};
-      sortedIds.forEach(id => {
-        const parentId = newEdges.find(e => e.target === id && (e.type === 'family' || e.type === 'deletable'))?.source || 'root';
-        if (!groups[parentId]) groups[parentId] = [];
-        groups[parentId].push(id);
-      });
-
-      let currentX = -(sortedIds.length * horizontalSpacing) / 2;
-      const processed = new Set();
-      
-      Object.entries(groups).forEach(([parentId, ids]) => {
-        const parentNode = newNodes.find(n => n.id === parentId);
-        if (parentNode && parentId !== 'root') {
-          // Calculate true group width including spouses
-          let totalGroupWidth = 0;
-          const spouseProcessed = new Set();
-          ids.forEach(id => {
-            if (spouseProcessed.has(id)) return;
-            const spouseId = getSpouseLocal(id, newEdges);
-            const isSpouseAlsoChild = spouseId && isSpouseAlsoChildLocal(spouseId, newEdges);
-            if (spouseId && !isSpouseAlsoChild) {
-              totalGroupWidth += horizontalSpacing + 220;
-              spouseProcessed.add(id);
-              spouseProcessed.add(spouseId);
-            } else {
-              totalGroupWidth += horizontalSpacing;
-            }
-          });
-          totalGroupWidth -= horizontalSpacing; // Adjust for the last gap/width
-
-          const parentCenterX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
-          currentX = parentCenterX - (totalGroupWidth / 2) - 80;
-        }
-
-        ids.forEach(id => {
-          if (processed.has(id)) return;
-          const node = newNodes.find(n => n.id === id);
-          if (!node) return;
-          const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
-          const spouseId = spouseEdge ? (spouseEdge.source === id ? spouseEdge.target : spouseEdge.source) : null;
-          const isSpouseAlsoChild = spouseId && isSpouseAlsoChildLocal(spouseId, newEdges);
-          const shouldBundleSpouse = spouseId && !isSpouseAlsoChild;
-
-          newNodes[newNodes.findIndex(n => n.id === id)] = { ...node, position: { x: currentX, y } };
-          processed.add(id);
-          if (shouldBundleSpouse) {
-            const sNode = newNodes.find(n => n.id === spouseId);
-            if (sNode) {
-              newNodes[newNodes.findIndex(n => n.id === spouseId)] = { ...sNode, position: { x: currentX + 220, y } };
-              processed.add(spouseId);
-              currentX += horizontalSpacing + 220;
-            }
-          } else {
-            currentX += horizontalSpacing;
-          }
-        });
-        currentX += 100; // Gap between families
-      });
-    });
-
-    newNodes.forEach(node => {
+    // --- Reposition junction nodes exactly between their two parent cards ---
+    newNodes.forEach((node, i) => {
       if (node.type === 'junction') {
         const mEdges = newEdges.filter(e => e.target === node.id && e.type === 'marriage');
         if (mEdges.length === 2) {
           const pA = newNodes.find(n => n.id === mEdges[0].source);
           const pB = newNodes.find(n => n.id === mEdges[1].source);
           if (pA && pB) {
-            node.position = { x: (pA.position.x + pB.position.x) / 2 + 80 - 10, y: Math.max(pA.position.y, pB.position.y) + 220 };
+            // midX = average of the two card centres (each centre = card.x + CARD_W/2)
+            // Then subtract 10 so the 20px junction dot is centred there
+            const midX = ((pA.position.x + CARD_W / 2) + (pB.position.x + CARD_W / 2)) / 2 - 10;
+            // midY: parent card height ≈ 150px, children at parent.y + V_GAP (320)
+            // midpoint between 150 and 320 = ~235 → use 240 for clean spacing
+            const midY = Math.max(pA.position.y, pB.position.y) + 240;
+            newNodes[i] = { ...node, position: { x: midX, y: midY } };
           }
         }
       }
     });
 
     setNodes(newNodes);
+
     setEdges(newEdges);
     setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 100);
   }, [nodes, edges, takeSnapshot, fitView, setNodes, setEdges]);
+
 
   // Run cleanup once after mount — empty dep array so it only fires once
   useEffect(() => {
