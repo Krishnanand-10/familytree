@@ -35,7 +35,7 @@ const JunctionNode = () => {
         top: 10,
         left: 9,
         width: 2,
-        height: 28,
+        height: 40,
         background: 'var(--edge-color)',
         opacity: 0.6,
         zIndex: -1,
