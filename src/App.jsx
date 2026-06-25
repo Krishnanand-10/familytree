@@ -927,9 +927,41 @@ function FlowApp() {
     setTimeout(cleanupTree, 100);
   };
 
+  const onNodeDrag = useCallback((event, draggedNode) => {
+    if (draggedNode.type !== 'member') return;
+
+    setNodes((nds) => {
+      const connectedJunctionIds = edges
+        .filter(e => e.type === 'marriage' && (e.source === draggedNode.id || e.target === draggedNode.id))
+        .map(e => e.source === draggedNode.id ? e.target : e.source);
+
+      return nds.map(n => {
+        if (n.id === draggedNode.id) {
+          return { ...n, position: draggedNode.position };
+        }
+        if (n.type === 'junction' && connectedJunctionIds.includes(n.id)) {
+          const mEdges = edges.filter(e => e.target === n.id && e.type === 'marriage');
+          if (mEdges.length === 2) {
+            const parentAId = mEdges[0].source;
+            const parentBId = mEdges[1].source;
+            const pANode = parentAId === draggedNode.id ? draggedNode : nds.find(node => node.id === parentAId);
+            const pBNode = parentBId === draggedNode.id ? draggedNode : nds.find(node => node.id === parentBId);
+            if (pANode && pBNode) {
+              const targetX = Math.round((pANode.position.x + pBNode.position.x) / 2 + 80 - 10);
+              const targetY = Math.round(Math.max(pANode.position.y, pBNode.position.y) + 200);
+              return { ...n, position: { x: targetX, y: targetY } };
+            }
+          }
+        }
+        return n;
+      });
+    });
+  }, [edges, setNodes]);
+
   const onNodeDragStop = useCallback(() => {
     takeSnapshot();
-  }, [takeSnapshot]);
+    cleanupTree();
+  }, [takeSnapshot, cleanupTree]);
 
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => ({
@@ -1050,6 +1082,7 @@ function FlowApp() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
