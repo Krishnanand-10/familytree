@@ -45,6 +45,9 @@ function FlowApp() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [dbStatus, setDbStatus] = useState('loading'); // 'loading', 'connected', 'fallback'
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveToastMsg, setSaveToastMsg] = useState('Tree saved successfully');
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
     const saved = localStorage.getItem('family-tree-nodes');
@@ -55,13 +58,39 @@ function FlowApp() {
     return saved ? JSON.parse(saved) : initialEdges;
   });
 
-  const handleSaveClick = useCallback(() => {
-    // localStorage already auto-saves, but this gives user a visual confirmation
+
+
+  const handleSaveClick = useCallback(async () => {
+    setIsSaving(true);
+    
+    // Always backup to localStorage
     localStorage.setItem('family-tree-nodes', JSON.stringify(nodes));
     localStorage.setItem('family-tree-edges', JSON.stringify(edges));
     localStorage.setItem('family-tree-name', treeName);
-    setShowSaveToast(true);
-    setTimeout(() => setShowSaveToast(false), 2000);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes, edges })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      
+      setSaveToastMsg('Tree saved to database successfully');
+      setShowSaveToast(true);
+      setDbStatus('connected');
+    } catch (err) {
+      console.warn('Kinship: Could not save to database server. Saved locally.', err);
+      setSaveToastMsg('Saved locally (database offline)');
+      setShowSaveToast(true);
+      setDbStatus('fallback');
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setShowSaveToast(false), 3000);
+    }
   }, [nodes, edges, treeName]);
 
   // Track latest nodes/edges for cleanup logic to avoid stale closures
@@ -420,6 +449,37 @@ function FlowApp() {
     }
   }, [setNodes, setEdges, takeSnapshot]);
 
+  // Fetch family tree from API on mount, with LocalStorage fallback
+  useEffect(() => {
+    const loadTree = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/tree');
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        
+        if (data.nodes && data.edges) {
+          setNodes(data.nodes);
+          setEdges(data.edges);
+          setDbStatus('connected');
+          console.log('Kinship: Loaded family tree from database server.');
+          
+          // Trigger family tree auto-alignment layout cleanup
+          setTimeout(cleanupTree, 300);
+        } else {
+          setDbStatus('fallback');
+        }
+      } catch (err) {
+        console.warn('Kinship: Could not connect to API server. Falling back to local storage.', err);
+        setDbStatus('fallback');
+      }
+    };
+
+    loadTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setNodes, setEdges]); // cleanupTree not listed as dependency because of ref updates
+
   const rearrangeEverything = useCallback(() => {
     takeSnapshot();
     const newNodes = [...nodes];
@@ -708,8 +768,8 @@ function FlowApp() {
         })
       );
     } else {
-      // Generate a stable unique ID (timestamp + random suffix to avoid collisions)
-      const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      // Generate a stable unique ID (UUID for database compatibility)
+      const newId = crypto.randomUUID();
       const parentNode = nodes.find((n) => n.id === modalState.activeMemberId);
 
       let x, y;
@@ -851,6 +911,13 @@ function FlowApp() {
             onChange={(e) => setTreeName(e.target.value)}
             placeholder="Untitled Tree"
           />
+
+          <div className="k-divider-v" />
+
+          <div className={`db-status-badge ${dbStatus}`}>
+            <span className="db-status-dot" />
+            <span>{dbStatus === 'connected' ? 'Cloud Sync' : dbStatus === 'loading' ? 'Connecting...' : 'Local Mode'}</span>
+          </div>
         </div>
 
         <div className="k-header-center">
@@ -915,9 +982,9 @@ function FlowApp() {
 
           <div className="k-divider-v" />
 
-          <button className="k-save-btn" onClick={handleSaveClick}>
+          <button className="k-save-btn" onClick={handleSaveClick} disabled={isSaving}>
             <Save size={15} />
-            <span>Save</span>
+            <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
         </div>
       </header>
@@ -963,7 +1030,7 @@ function FlowApp() {
       {/* Save Toast */}
       <div className={`k-toast ${showSaveToast ? 'visible' : ''}`}>
         <Check size={16} />
-        <span>Tree saved successfully</span>
+        <span>{saveToastMsg}</span>
       </div>
       </>
   );
