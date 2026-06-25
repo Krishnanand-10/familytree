@@ -186,9 +186,17 @@ app.post('/api/tree', async (req, res) => {
       } else if (edge.type === 'family' || edge.type === 'deletable') {
         // If source is a junction (format: j-parentAId-parentBId)
         if (edge.source.startsWith('j-')) {
-          const parts = edge.source.split('-');
-          const parentA = parts[1];
-          const parentB = parts[2];
+          let parentA, parentB;
+          // UUID length is 36 chars. j-UUID-UUID is 2 + 36 + 1 + 36 = 75 chars.
+          if (edge.source.length === 75) {
+            parentA = edge.source.slice(2, 38);
+            parentB = edge.source.slice(39);
+          } else {
+            // Fallback for legacy short/timestamp-based IDs
+            const parts = edge.source.split('-');
+            parentA = parts[1];
+            parentB = parts[2];
+          }
           if (parentA && parentA !== 'j') {
             relationshipsRaw.push({ person_a: parentA, person_b: edge.target, type: 'parent' });
           }

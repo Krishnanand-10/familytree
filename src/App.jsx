@@ -458,12 +458,20 @@ function FlowApp() {
       
       const siblingUnits = siblingNodes.map(node => {
         const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === node.id || e.target === node.id));
-        const isMarried = !!spouseEdge;
+        const spouseId = spouseEdge ? (spouseEdge.source === node.id ? spouseEdge.target : spouseEdge.source) : null;
+        
+        // Check if spouse is also a child of another parent/branch in the tree
+        const isSpouseAlsoChild = spouseId && newEdges.some(e => e.target === spouseId && (e.type === 'family' || e.type === 'deletable'));
+        
+        // If the spouse is also a child in the tree, do not bundle them with this sibling unit
+        // to prevent positioning conflicts between their respective parent branches.
+        const shouldBundleSpouse = spouseId && !isSpouseAlsoChild;
+
         return {
           id: node.id,
-          width: isMarried ? 400 : 180,
+          width: shouldBundleSpouse ? 400 : 180,
           node: node,
-          spouseId: spouseEdge ? (spouseEdge.source === node.id ? spouseEdge.target : spouseEdge.source) : null
+          spouseId: shouldBundleSpouse ? spouseId : null
         };
       });
 
@@ -542,6 +550,11 @@ function FlowApp() {
       const edge = eds.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
       if (!edge) return null;
       return edge.source === id ? edge.target : edge.source;
+    };
+
+    const isSpouseAlsoChildLocal = (spouseId, eds) => {
+      if (!spouseId) return false;
+      return eds.some(e => e.target === spouseId && (e.type === 'family' || e.type === 'deletable'));
     };
 
     const levels = {};
@@ -636,7 +649,8 @@ function FlowApp() {
           ids.forEach(id => {
             if (spouseProcessed.has(id)) return;
             const spouseId = getSpouseLocal(id, newEdges);
-            if (spouseId) {
+            const isSpouseAlsoChild = spouseId && isSpouseAlsoChildLocal(spouseId, newEdges);
+            if (spouseId && !isSpouseAlsoChild) {
               totalGroupWidth += horizontalSpacing + 220;
               spouseProcessed.add(id);
               spouseProcessed.add(spouseId);
@@ -656,9 +670,12 @@ function FlowApp() {
           if (!node) return;
           const spouseEdge = newEdges.find(e => e.type === 'spouse' && (e.source === id || e.target === id));
           const spouseId = spouseEdge ? (spouseEdge.source === id ? spouseEdge.target : spouseEdge.source) : null;
+          const isSpouseAlsoChild = spouseId && isSpouseAlsoChildLocal(spouseId, newEdges);
+          const shouldBundleSpouse = spouseId && !isSpouseAlsoChild;
+
           newNodes[newNodes.findIndex(n => n.id === id)] = { ...node, position: { x: currentX, y } };
           processed.add(id);
-          if (spouseId) {
+          if (shouldBundleSpouse) {
             const sNode = newNodes.find(n => n.id === spouseId);
             if (sNode) {
               newNodes[newNodes.findIndex(n => n.id === spouseId)] = { ...sNode, position: { x: currentX + 220, y } };
@@ -960,8 +977,7 @@ function FlowApp() {
 
   const onNodeDragStop = useCallback(() => {
     takeSnapshot();
-    cleanupTree();
-  }, [takeSnapshot, cleanupTree]);
+  }, [takeSnapshot]);
 
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => ({
