@@ -1012,3 +1012,85 @@ body {
   50% { opacity: 1; }
   100% { opacity: 0.4; }
 }
+
+/* ── Compact Modal Layout Grid ────────────────────────────────────────────── */
+.modal-container {
+  max-width: 520px; /* Slightly wider to accommodate side-by-side layout */
+}
+
+.modal-form {
+  padding: 16px 20px;
+}
+
+.modal-body-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.mbg-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.mbg-left .form-group {
+  margin-bottom: 0;
+  height: 100%;
+}
+
+.mbg-left .image-uploader {
+  width: 100%;
+  height: 146px; /* Match height of right column fields approximately */
+}
+
+.mbg-left .upload-zone {
+  width: 100%;
+  height: 100%;
+  padding: 12px 6px;
+  gap: 4px;
+}
+
+.mbg-left .upload-zone span {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.mbg-left .upload-zone svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mbg-left .upload-zone small {
+  display: none; /* Hide detailed upload info to fit compact square */
+}
+
+.mbg-left .image-preview-wrap {
+  width: 100%;
+  height: 100%;
+}
+
+.mbg-left .img-overlay-btn {
+  padding: 4px 8px;
+  font-size: 10px;
+  gap: 4px;
+  border-radius: 12px;
+}
+
+.mbg-left .img-overlay-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mbg-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.mbg-right .form-group {
+  margin-bottom: 10px;
+}
+
+.mbg-right .form-row {
+  gap: 12px;
+}

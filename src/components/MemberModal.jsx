@@ -41,88 +41,94 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         </div>
         
         <form onSubmit={handleSubmit} className="modal-form">
-          <div className="form-group">
-            <label>Full Name</label>
-            <input 
-              type="text" 
-              value={formData.name} 
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              placeholder="e.g. John Smith"
-              required
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Gender</label>
-              <select 
-                value={formData.gender} 
-                onChange={(e) => setFormData({...formData, gender: e.target.value})}
-              >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other / Unknown</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Status</label>
-              <div className="checkbox-group">
-                <input 
-                  type="checkbox" 
-                  id="isAlive" 
-                  checked={formData.isAlive} 
-                  onChange={(e) => setFormData({...formData, isAlive: e.target.checked, deathYear: e.target.checked ? '' : formData.deathYear})}
-                />
-                <label htmlFor="isAlive">Is Alive</label>
-              </div>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Birth Year</label>
-              <input 
-                type="number" 
-                value={formData.birthYear} 
-                onChange={(e) => setFormData({...formData, birthYear: e.target.value})}
-                placeholder="YYYY"
-              />
-            </div>
-            {!formData.isAlive && (
+          <div className="modal-body-grid">
+            <div className="mbg-left">
               <div className="form-group">
-                <label>Death Year</label>
-                <input 
-                  type="number" 
-                  value={formData.deathYear} 
-                  onChange={(e) => setFormData({...formData, deathYear: e.target.value})}
-                  placeholder="YYYY"
+                <label>Photo</label>
+                <ImageUploader
+                  value={formData.imageUrl}
+                  gender={formData.gender}
+                  onChange={(val) => setFormData({ ...formData, imageUrl: val })}
                 />
               </div>
-            )}
+            </div>
+
+            <div className="mbg-right">
+              <div className="form-group">
+                <label>Full Name</label>
+                <input 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="e.g. John Smith"
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select 
+                    value={formData.gender} 
+                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other / Unknown</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <div className="checkbox-group">
+                    <input 
+                      type="checkbox" 
+                      id="isAlive" 
+                      checked={formData.isAlive} 
+                      onChange={(e) => setFormData({...formData, isAlive: e.target.checked, deathYear: e.target.checked ? '' : formData.deathYear})}
+                    />
+                    <label htmlFor="isAlive">Is Alive</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Birth Year</label>
+                  <input 
+                    type="number" 
+                    value={formData.birthYear} 
+                    onChange={(e) => setFormData({...formData, birthYear: e.target.value})}
+                    placeholder="YYYY"
+                  />
+                </div>
+                {!formData.isAlive && (
+                  <div className="form-group">
+                    <label>Death Year</label>
+                    <input 
+                      type="number" 
+                      value={formData.deathYear} 
+                      onChange={(e) => setFormData({...formData, deathYear: e.target.value})}
+                      placeholder="YYYY"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>Photo</label>
-            <ImageUploader
-              value={formData.imageUrl}
-              gender={formData.gender}
-              onChange={(val) => setFormData({ ...formData, imageUrl: val })}
-            />
-          </div>
-
-          <div className="form-group">
+          <div className="form-group" style={{ marginBottom: '12px' }}>
             <label>Notes</label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Add a short bio, memories, or any notes…"
-              rows={3}
+              rows={2}
               style={{
                 width: '100%',
-                padding: '10px 12px',
+                padding: '8px 12px',
                 border: '1px solid #ddd',
                 borderRadius: '6px',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontFamily: 'inherit',
                 resize: 'vertical',
                 transition: 'border-color 0.2s',
