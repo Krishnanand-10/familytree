@@ -36,6 +36,51 @@ const edgeTypes = {
   spouse: SpouseEdge,
 };
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUUID = (id) => id && (id.startsWith('j-') || uuidRegex.test(id));
+
+function migrateLegacyIds(nodes = [], edges = []) {
+  const idMap = {};
+  
+  // 1. Map legacy member IDs to UUIDs
+  const migratedNodes = nodes.map(node => {
+    if (node.type === 'member' && !isUUID(node.id)) {
+      const newUuid = crypto.randomUUID();
+      idMap[node.id] = newUuid;
+      return { ...node, id: newUuid };
+    }
+    return node;
+  });
+
+  // 2. Map legacy edges to use new UUIDs
+  const migratedEdges = edges.map(edge => {
+    let source = edge.source;
+    let target = edge.target;
+    let id = edge.id;
+
+    if (idMap[source]) source = idMap[source];
+    if (idMap[target]) target = idMap[target];
+
+    // Re-construct the edge ID if source or target was migrated
+    if (idMap[edge.source] || idMap[edge.target]) {
+      if (edge.type === 'spouse') {
+        id = `s-${source}-${target}`;
+      } else if (edge.type === 'family' || edge.type === 'deletable' || edge.type === 'marriage') {
+        id = `e-${source}-${target}`;
+      }
+    }
+
+    return {
+      ...edge,
+      id,
+      source,
+      target
+    };
+  });
+
+  return { nodes: migratedNodes, edges: migratedEdges };
+}
+
 // Inner component that can use useReactFlow()
 function FlowApp() {
   const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
@@ -50,12 +95,20 @@ function FlowApp() {
   const [saveToastMsg, setSaveToastMsg] = useState('Tree saved successfully');
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
-    const saved = localStorage.getItem('family-tree-nodes');
-    return saved ? JSON.parse(saved) : initialNodes;
+    const savedNodes = localStorage.getItem('family-tree-nodes');
+    const savedEdges = localStorage.getItem('family-tree-edges');
+    const parsedNodes = savedNodes ? JSON.parse(savedNodes) : initialNodes;
+    const parsedEdges = savedEdges ? JSON.parse(savedEdges) : initialEdges;
+    const { nodes: migrated } = migrateLegacyIds(parsedNodes, parsedEdges);
+    return migrated;
   });
   const [edges, setEdges, onEdgesChange] = useEdgesState(() => {
-    const saved = localStorage.getItem('family-tree-edges');
-    return saved ? JSON.parse(saved) : initialEdges;
+    const savedNodes = localStorage.getItem('family-tree-nodes');
+    const savedEdges = localStorage.getItem('family-tree-edges');
+    const parsedNodes = savedNodes ? JSON.parse(savedNodes) : initialNodes;
+    const parsedEdges = savedEdges ? JSON.parse(savedEdges) : initialEdges;
+    const { edges: migrated } = migrateLegacyIds(parsedNodes, parsedEdges);
+    return migrated;
   });
 
 
@@ -736,10 +789,11 @@ function FlowApp() {
             setTreeName(data.name);
             localStorage.setItem('family-tree-name', data.name);
           }
-          setNodes(data.nodes);
-          setEdges(data.edges);
-          localStorage.setItem('family-tree-nodes', JSON.stringify(data.nodes));
-          localStorage.setItem('family-tree-edges', JSON.stringify(data.edges));
+          const { nodes: migratedNodes, edges: migratedEdges } = migrateLegacyIds(data.nodes, data.edges);
+          setNodes(migratedNodes);
+          setEdges(migratedEdges);
+          localStorage.setItem('family-tree-nodes', JSON.stringify(migratedNodes));
+          localStorage.setItem('family-tree-edges', JSON.stringify(migratedEdges));
           
           // Show toast
           setShowSaveToast(true);
