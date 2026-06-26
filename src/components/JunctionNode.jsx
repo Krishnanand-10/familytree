@@ -18,13 +18,13 @@ const JunctionNode = () => {
       {/* The central junction dot */}
       <div className="junction-dot" style={{
         position: 'absolute',
-        top: 3,
-        left: 3,
-        width: 14,
-        height: 14,
+        top: 6,
+        left: 6,
+        width: 8,
+        height: 8,
         borderRadius: '50%',
         background: 'var(--primary-color)',
-        border: '2px solid white',
+        border: '1.5px solid white',
         boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
         zIndex: 10,
       }} />
