@@ -523,7 +523,6 @@ function FlowApp() {
   // Cleanup and migrate old edges to junctions
 
   const cleanupTree = useCallback((shouldRearrange = false) => {
-    console.log('cleanupTree called, shouldRearrange:', shouldRearrange);
     let hasChanged = false;
     let newEdges = [...edgesRef.current];
     let newNodes = [...nodesRef.current];
@@ -684,7 +683,6 @@ function FlowApp() {
 
     if (shouldRearrange) {
       const { nodes: alignedNodes, edges: alignedEdges } = layoutTree(newNodes, newEdges);
-      console.log('layoutTree result nodes:', alignedNodes.map(n => ({id:n.id, pos:n.position})));
       newNodes = alignedNodes;
       newEdges = alignedEdges;
       hasChanged = true;
