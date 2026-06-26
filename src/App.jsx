@@ -21,6 +21,7 @@ import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
 import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const nodeTypes = {
   member: MemberNode,
@@ -1247,17 +1248,21 @@ function FlowApp() {
           <Background variant="dots" gap={12} size={1} />
         </ReactFlow>
 
-        <button
+        <motion.button
           className="k-fab"
           onClick={() => setModalState({ isOpen: true, mode: 'add', activeMemberId: null, relativeType: null })}
           title="Add a New Person"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.5, type: 'spring', stiffness: 260, damping: 20 }}
+          whileHover={{ scale: 1.12, boxShadow: '0 8px 28px rgba(255,107,53,0.55)' }}
+          whileTap={{ scale: 0.92 }}
         >
           <Plus size={22} />
-        </button>
+        </motion.button>
       </main>
 
-      {modalState.isOpen && (
-        <MemberModal
+      <MemberModal
           isOpen={modalState.isOpen}
           mode={modalState.mode}
           member={activeMember}
@@ -1265,13 +1270,22 @@ function FlowApp() {
           onSave={handleSaveMember}
           onDelete={handleDelete}
         />
-      )}
 
       {/* Save Toast */}
-      <div className={`k-toast ${showSaveToast ? 'visible' : ''}`}>
-        <Check size={16} />
-        <span>{saveToastMsg}</span>
-      </div>
+      <AnimatePresence>
+        {showSaveToast && (
+          <motion.div
+            className="k-toast visible"
+            initial={{ opacity: 0, y: 20, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.92 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <Check size={16} />
+            <span>{saveToastMsg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { X, Save, Trash2, Camera, Upload, XCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
   const [formData, setFormData] = useState(() => {
@@ -25,19 +26,37 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
     };
   });
 
-  if (!isOpen) return null;
-
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(formData);
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-container">
+    <AnimatePresence>
+      {isOpen && (
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
+    >
+      <motion.div
+        className="modal-container"
+        initial={{ opacity: 0, scale: 0.88, y: 32 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.88, y: 32 }}
+        transition={{ duration: 0.28, ease: [0.34, 1.56, 0.64, 1] }}
+      >
         <div className="modal-header">
           <h2>{mode === 'edit' ? 'Edit Family Member' : 'Add Family Member'}</h2>
-          <button onClick={onClose} className="close-btn"><X size={20} /></button>
+          <motion.button
+            onClick={onClose}
+            className="close-btn"
+            whileHover={{ scale: 1.15, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{ duration: 0.18 }}
+          ><X size={20} /></motion.button>
         </div>
         
         <form onSubmit={handleSubmit} className="modal-form">
@@ -151,8 +170,10 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
