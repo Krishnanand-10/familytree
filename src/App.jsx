@@ -383,9 +383,18 @@ function FlowApp() {
         newNodes = newNodes.filter(n => n.id !== pair.junctionId);
         newEdges = newEdges.filter(e => e.target !== pair.junctionId && e.source !== pair.junctionId);
         
-        const edgeId = `s-${pair.parentAId}-${pair.parentBId}`;
+        const pA = newNodes.find(n => n.id === pair.parentAId);
+        const pB = newNodes.find(n => n.id === pair.parentBId);
+        let leftId = pair.parentAId;
+        let rightId = pair.parentBId;
+        if (pA && pB && pA.position.x > pB.position.x) {
+          leftId = pair.parentBId;
+          rightId = pair.parentAId;
+        }
+
+        const edgeId = `s-${leftId}-${rightId}`;
         if (!newEdges.find(e => e.id === edgeId)) {
-          newEdges.push({ id: edgeId, source: pair.parentAId, target: pair.parentBId, sourceHandle: 'spouse-out', targetHandle: 'spouse-in', type: 'spouse' });
+          newEdges.push({ id: edgeId, source: leftId, target: rightId, sourceHandle: 'spouse-out', targetHandle: 'spouse-in', type: 'spouse' });
         }
         hasChanged = true;
       } else if (hasChildren && pair.junctionId) {
@@ -480,22 +489,49 @@ function FlowApp() {
 
       siblingUnits.forEach((unit) => {
         const currentTargetX = Math.round(currentX + (unit.width === 400 ? 0 : 10));
-        
-        if (Math.abs(unit.node.position.x - currentTargetX) > 1 || Math.abs(unit.node.position.y - targetY) > 1) {
-          const nodeIndex = newNodes.findIndex(n => n.id === unit.id);
-          newNodes[nodeIndex] = { ...newNodes[nodeIndex], position: { x: currentTargetX, y: targetY } };
-          hasChanged = true;
-        }
+        const spouseNode = unit.spouseId ? newNodes.find(n => n.id === unit.spouseId) : null;
+        const isNodeFemaleSpouseMale = unit.node?.data?.gender === 'female' && spouseNode?.data?.gender === 'male';
 
-        if (unit.spouseId) {
-          const spouseNode = newNodes.find(n => n.id === unit.spouseId);
-          if (spouseNode) {
-            const sTargetX = currentTargetX + 220;
-            if (Math.abs(spouseNode.position.x - sTargetX) > 1 || Math.abs(spouseNode.position.y - targetY) > 1) {
-              const sIdx = newNodes.findIndex(n => n.id === spouseNode.id);
-              newNodes[sIdx] = { ...spouseNode, position: { x: sTargetX, y: targetY } };
+        if (unit.spouseId && spouseNode) {
+          const nodeTargetX = isNodeFemaleSpouseMale ? currentTargetX + 220 : currentTargetX;
+          const spouseTargetX = isNodeFemaleSpouseMale ? currentTargetX : currentTargetX + 220;
+
+          if (Math.abs(unit.node.position.x - nodeTargetX) > 1 || Math.abs(unit.node.position.y - targetY) > 1) {
+            const nodeIndex = newNodes.findIndex(n => n.id === unit.id);
+            newNodes[nodeIndex] = { ...newNodes[nodeIndex], position: { x: nodeTargetX, y: targetY } };
+            hasChanged = true;
+          }
+
+          if (Math.abs(spouseNode.position.x - spouseTargetX) > 1 || Math.abs(spouseNode.position.y - targetY) > 1) {
+            const sIdx = newNodes.findIndex(n => n.id === spouseNode.id);
+            newNodes[sIdx] = { ...spouseNode, position: { x: spouseTargetX, y: targetY } };
+            hasChanged = true;
+          }
+
+          // Normalize the spouse edge so source is on the left and target is on the right
+          const leftId = isNodeFemaleSpouseMale ? spouseNode.id : unit.node.id;
+          const rightId = isNodeFemaleSpouseMale ? unit.node.id : spouseNode.id;
+          const sEdgeIdx = newEdges.findIndex(e => e.type === 'spouse' && 
+            ((e.source === unit.node.id && e.target === spouseNode.id) || (e.source === spouseNode.id && e.target === unit.node.id))
+          );
+          if (sEdgeIdx !== -1) {
+            if (newEdges[sEdgeIdx].source !== leftId || newEdges[sEdgeIdx].target !== rightId) {
+              newEdges[sEdgeIdx] = {
+                ...newEdges[sEdgeIdx],
+                id: `s-${leftId}-${rightId}`,
+                source: leftId,
+                target: rightId,
+                sourceHandle: 'spouse-out',
+                targetHandle: 'spouse-in'
+              };
               hasChanged = true;
             }
+          }
+        } else {
+          if (Math.abs(unit.node.position.x - currentTargetX) > 1 || Math.abs(unit.node.position.y - targetY) > 1) {
+            const nodeIndex = newNodes.findIndex(n => n.id === unit.id);
+            newNodes[nodeIndex] = { ...newNodes[nodeIndex], position: { x: currentTargetX, y: targetY } };
+            hasChanged = true;
           }
         }
 
@@ -680,12 +716,43 @@ function FlowApp() {
         // leftX = centerX - (2*CARD_W + H_GAP)/2 = centerX - CARD_W - H_GAP/2
         const leftX  = centerX - CARD_W - H_GAP / 2;
         const rightX = centerX + H_GAP / 2;
-        newNodes[idx] = { ...newNodes[idx], position: { x: leftX, y } };
-        const spIdx = newNodes.findIndex(n => n.id === spouseId);
-        if (spIdx !== -1) {
-          newNodes[spIdx] = { ...newNodes[spIdx], position: { x: rightX, y } };
+
+        const node = newNodes[idx];
+        const spouseNode = newNodes.find(n => n.id === spouseId);
+        const spouseIdx = newNodes.findIndex(n => n.id === spouseId);
+        const isNodeFemaleSpouseMale = node?.data?.gender === 'female' && spouseNode?.data?.gender === 'male';
+
+        if (isNodeFemaleSpouseMale) {
+          // Spouse (male) on the left, Node (female) on the right
+          if (spouseIdx !== -1) {
+            newNodes[spouseIdx] = { ...newNodes[spouseIdx], position: { x: leftX, y } };
+          }
+          newNodes[idx] = { ...newNodes[idx], position: { x: rightX, y } };
+        } else {
+          // Node on the left, Spouse on the right
+          newNodes[idx] = { ...newNodes[idx], position: { x: leftX, y } };
+          if (spouseIdx !== -1) {
+            newNodes[spouseIdx] = { ...newNodes[spouseIdx], position: { x: rightX, y } };
+          }
         }
         positioned.add(spouseId);
+
+        // Normalize the spouse edge so source is on the left and target is on the right
+        const leftId = isNodeFemaleSpouseMale ? spouseId : nodeId;
+        const rightId = isNodeFemaleSpouseMale ? nodeId : spouseId;
+        const sEdgeIdx = newEdges.findIndex(e => e.type === 'spouse' && 
+          ((e.source === nodeId && e.target === spouseId) || (e.source === spouseId && e.target === nodeId))
+        );
+        if (sEdgeIdx !== -1) {
+          newEdges[sEdgeIdx] = {
+            ...newEdges[sEdgeIdx],
+            id: `s-${leftId}-${rightId}`,
+            source: leftId,
+            target: rightId,
+            sourceHandle: 'spouse-out',
+            targetHandle: 'spouse-in'
+          };
+        }
       } else {
         // Place single node centered
         newNodes[idx] = { ...newNodes[idx], position: { x: centerX - CARD_W / 2, y } };
