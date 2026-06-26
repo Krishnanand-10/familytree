@@ -22,6 +22,7 @@ import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
 import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import BranchSwitcher from './components/BranchSwitcher';
 
 const nodeTypes = {
   member: MemberNode,
@@ -332,8 +333,29 @@ function layoutTree(nodes, edges) {
 // Inner component that can use useReactFlow()
 function FlowApp() {
   const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
+
+  // ── Branch Management ──────────────────────────────────────────────────────
+  const DEFAULT_BRANCH_ID = 'default';
+
+  const [branches, setBranches] = useState(() => {
+    const saved = localStorage.getItem('family-tree-branches');
+    if (saved) return JSON.parse(saved);
+    const defaultBranch = { id: DEFAULT_BRANCH_ID, name: 'My Family Tree' };
+    localStorage.setItem('family-tree-branches', JSON.stringify([defaultBranch]));
+    return [defaultBranch];
+  });
+
+  const [activeBranchId, setActiveBranchId] = useState(() => {
+    return localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID;
+  });
+
+  const nodesKey = `family-tree-nodes-${activeBranchId}`;
+  const edgesKey = `family-tree-edges-${activeBranchId}`;
+
   const [treeName, setTreeName] = useState(() => {
-    return localStorage.getItem('family-tree-name') || 'My Family Tree';
+    const branch = JSON.parse(localStorage.getItem('family-tree-branches') || '[]')
+      .find(b => b.id === (localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID));
+    return branch?.name || 'My Family Tree';
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -343,16 +365,18 @@ function FlowApp() {
   const [saveToastMsg, setSaveToastMsg] = useState('Tree saved successfully');
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
-    const savedNodes = localStorage.getItem('family-tree-nodes');
-    const savedEdges = localStorage.getItem('family-tree-edges');
+    const activeId = localStorage.getItem('family-tree-active-branch') || 'default';
+    const savedNodes = localStorage.getItem(`family-tree-nodes-${activeId}`) || localStorage.getItem('family-tree-nodes');
+    const savedEdges = localStorage.getItem(`family-tree-edges-${activeId}`) || localStorage.getItem('family-tree-edges');
     const parsedNodes = savedNodes ? JSON.parse(savedNodes) : initialNodes;
     const parsedEdges = savedEdges ? JSON.parse(savedEdges) : initialEdges;
     const { nodes: migrated } = migrateLegacyIds(parsedNodes, parsedEdges);
     return migrated;
   });
   const [edges, setEdges, onEdgesChange] = useEdgesState(() => {
-    const savedNodes = localStorage.getItem('family-tree-nodes');
-    const savedEdges = localStorage.getItem('family-tree-edges');
+    const activeId = localStorage.getItem('family-tree-active-branch') || 'default';
+    const savedNodes = localStorage.getItem(`family-tree-nodes-${activeId}`) || localStorage.getItem('family-tree-nodes');
+    const savedEdges = localStorage.getItem(`family-tree-edges-${activeId}`) || localStorage.getItem('family-tree-edges');
     const parsedNodes = savedNodes ? JSON.parse(savedNodes) : initialNodes;
     const parsedEdges = savedEdges ? JSON.parse(savedEdges) : initialEdges;
     const { edges: migrated } = migrateLegacyIds(parsedNodes, parsedEdges);
@@ -364,10 +388,16 @@ function FlowApp() {
   const handleSaveClick = useCallback(async () => {
     setIsSaving(true);
     
-    // Always backup to localStorage
+    // Always backup to localStorage (branch-specific keys)
+    localStorage.setItem(nodesKey, JSON.stringify(nodes));
+    localStorage.setItem(edgesKey, JSON.stringify(edges));
+    // Update branch name
+    const updatedBranches = branches.map(b => b.id === activeBranchId ? { ...b, name: treeName } : b);
+    setBranches(updatedBranches);
+    localStorage.setItem('family-tree-branches', JSON.stringify(updatedBranches));
+    // Legacy keys for backwards compat
     localStorage.setItem('family-tree-nodes', JSON.stringify(nodes));
     localStorage.setItem('family-tree-edges', JSON.stringify(edges));
-    localStorage.setItem('family-tree-name', treeName);
 
     try {
       const res = await fetch('http://localhost:5000/api/tree', {
@@ -428,10 +458,74 @@ function FlowApp() {
     setRedoStack((prev) => prev.slice(0, -1));
   }, [redoStack, nodes, edges, setNodes, setEdges]);
 
-  // Save tree name
+  // Save branch name when treeName changes
   useEffect(() => {
-    localStorage.setItem('family-tree-name', treeName);
-  }, [treeName]);
+    const updatedBranches = branches.map(b => b.id === activeBranchId ? { ...b, name: treeName } : b);
+    setBranches(updatedBranches);
+    localStorage.setItem('family-tree-branches', JSON.stringify(updatedBranches));
+  }, [treeName]); // eslint-disable-line
+
+  // Save to localStorage (branch-specific) when tree changes
+  useEffect(() => {
+    localStorage.setItem(nodesKey, JSON.stringify(nodes));
+    localStorage.setItem(edgesKey, JSON.stringify(edges));
+  }, [nodes, edges, nodesKey, edgesKey]);
+
+  // ── Branch handlers ─────────────────────────────────────────────────────────
+  const switchBranch = useCallback((branchId) => {
+    // Save current branch first
+    localStorage.setItem(nodesKey, JSON.stringify(nodes));
+    localStorage.setItem(edgesKey, JSON.stringify(edges));
+
+    // Load new branch
+    const newNodesKey = `family-tree-nodes-${branchId}`;
+    const newEdgesKey = `family-tree-edges-${branchId}`;
+    const savedNodes = localStorage.getItem(newNodesKey);
+    const savedEdges = localStorage.getItem(newEdgesKey);
+    const parsedNodes = savedNodes ? JSON.parse(savedNodes) : [];
+    const parsedEdges = savedEdges ? JSON.parse(savedEdges) : [];
+    const { nodes: mN, edges: mE } = migrateLegacyIds(parsedNodes, parsedEdges);
+
+    setNodes(mN);
+    setEdges(mE);
+    setActiveBranchId(branchId);
+    localStorage.setItem('family-tree-active-branch', branchId);
+
+    const branch = branches.find(b => b.id === branchId);
+    if (branch) setTreeName(branch.name);
+
+    setTimeout(() => fitView({ duration: 600, padding: 0.2 }), 200);
+  }, [nodesKey, edgesKey, nodes, edges, branches, setNodes, setEdges, fitView]);
+
+  const createBranch = useCallback((name) => {
+    const newId = crypto.randomUUID();
+    const newBranch = { id: newId, name };
+    const updated = [...branches, newBranch];
+    setBranches(updated);
+    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
+    // Save current branch
+    localStorage.setItem(nodesKey, JSON.stringify(nodes));
+    localStorage.setItem(edgesKey, JSON.stringify(edges));
+    // Switch to new empty branch
+    setNodes([]);
+    setEdges([]);
+    setActiveBranchId(newId);
+    localStorage.setItem('family-tree-active-branch', newId);
+    setTreeName(name);
+  }, [branches, nodesKey, edgesKey, nodes, edges, setNodes, setEdges]);
+
+  const deleteBranch = useCallback((branchId) => {
+    const updated = branches.filter(b => b.id !== branchId);
+    setBranches(updated);
+    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
+    localStorage.removeItem(`family-tree-nodes-${branchId}`);
+    localStorage.removeItem(`family-tree-edges-${branchId}`);
+    // If deleting active branch, switch to first remaining
+    if (branchId === activeBranchId && updated.length > 0) {
+      switchBranch(updated[0].id);
+    }
+  }, [branches, activeBranchId, switchBranch]);
+
 
   // Modal State
   const [modalState, setModalState] = useState({
@@ -440,12 +534,6 @@ function FlowApp() {
     activeMemberId: null,
     relativeType: null,
   });
-
-  // Save to localStorage when tree changes
-  useEffect(() => {
-    localStorage.setItem('family-tree-nodes', JSON.stringify(nodes));
-    localStorage.setItem('family-tree-edges', JSON.stringify(edges));
-  }, [nodes, edges]);
 
   // Handle unlinking via custom event from DeletableEdge
   useEffect(() => {
@@ -457,6 +545,19 @@ function FlowApp() {
 
     window.addEventListener('edge-unlink', handleUnlink);
     return () => window.removeEventListener('edge-unlink', handleUnlink);
+  }, [setEdges, takeSnapshot]);
+
+  // Handle relationship label updates from DeletableEdge
+  useEffect(() => {
+    const handleSetLabel = (event) => {
+      const { id, label } = event.detail;
+      takeSnapshot();
+      setEdges((eds) => eds.map((e) =>
+        e.id === id ? { ...e, label: label || undefined } : e
+      ));
+    };
+    window.addEventListener('edge-set-label', handleSetLabel);
+    return () => window.removeEventListener('edge-set-label', handleSetLabel);
   }, [setEdges, takeSnapshot]);
 
   // Handle adding person from edge
@@ -919,6 +1020,57 @@ function FlowApp() {
     downloadAnchor.remove();
   };
 
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleExportPNG = async () => {
+    setShowExportMenu(false);
+    const viewport = document.querySelector('.react-flow__viewport');
+    if (!viewport) return;
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(viewport, {
+        backgroundColor: '#f8f9fa',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      });
+      const link = document.createElement('a');
+      link.download = `${treeName.replace(/\s+/g, '_')}_tree.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setShowExportMenu(false);
+    const viewport = document.querySelector('.react-flow__viewport');
+    if (!viewport) return;
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(viewport, {
+        backgroundColor: '#f8f9fa',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2],
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save(`${treeName.replace(/\s+/g, '_')}_tree.pdf`);
+    } catch (err) {
+      alert('PDF export failed: ' + err.message);
+    }
+  };
+
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -1145,6 +1297,16 @@ function FlowApp() {
 
           <div className="k-divider-v" />
 
+          <BranchSwitcher
+            branches={branches}
+            activeBranchId={activeBranchId}
+            onSwitch={switchBranch}
+            onCreate={createBranch}
+            onDelete={deleteBranch}
+          />
+
+          <div className="k-divider-v" />
+
           <input
             className="k-tree-name"
             value={treeName}
@@ -1205,9 +1367,30 @@ function FlowApp() {
             <Trash2 size={16} />
           </button>
 
-          <button className="k-tool-btn" onClick={handleExportTree} title="Export Backup (JSON)">
-            <Download size={16} />
-          </button>
+          {/* Export dropdown */}
+          <div className="export-dropdown-wrap">
+            <button
+              className="k-tool-btn"
+              onClick={() => setShowExportMenu(v => !v)}
+              title="Export"
+            >
+              <Download size={16} />
+              <span style={{ fontSize: 11 }}>Export</span>
+            </button>
+            {showExportMenu && (
+              <div className="export-dropdown" onMouseLeave={() => setShowExportMenu(false)}>
+                <button className="export-opt" onClick={handleExportTree}>
+                  <Download size={14} /> JSON Backup
+                </button>
+                <button className="export-opt" onClick={handleExportPNG}>
+                  <Download size={14} /> PNG Image
+                </button>
+                <button className="export-opt" onClick={handleExportPDF}>
+                  <Download size={14} /> PDF
+                </button>
+              </div>
+            )}
+          </div>
 
           <button className="k-tool-btn" onClick={handleImportClick} title="Import Backup (JSON)">
             <Upload size={16} />
