@@ -1,23 +1,5 @@
-import { useState } from 'react';
 import { getSmoothStepPath, EdgeLabelRenderer, BaseEdge } from '@xyflow/react';
-import { X, Plus, Tag } from 'lucide-react';
-
-const RELATIONSHIP_LABELS = [
-  { value: '',           display: 'None' },
-  { value: 'Biological', display: 'Biological' },
-  { value: 'Adopted',    display: 'Adopted' },
-  { value: 'Step-child', display: 'Step-child' },
-  { value: 'Guardian',   display: 'Guardian' },
-  { value: 'Foster',     display: 'Foster' },
-];
-
-const LABEL_COLORS = {
-  'Biological': '#2196f3',
-  'Adopted':    '#9c27b0',
-  'Step-child': '#ff9800',
-  'Guardian':   '#4caf50',
-  'Foster':     '#00bcd4',
-};
+import { X, Plus } from 'lucide-react';
 
 export default function DeletableEdge({
   id,
@@ -31,12 +13,9 @@ export default function DeletableEdge({
   targetPosition,
   style = {},
   markerEnd,
-  label,
   selected,
   sourceHandleId,
 }) {
-  const [showLabelPicker, setShowLabelPicker] = useState(false);
-
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -47,9 +26,8 @@ export default function DeletableEdge({
     borderRadius: 0,
   });
 
-  const isSpouseEdge = sourceHandleId === 'spouse-out' || label === 'Married';
+  const isSpouseEdge = sourceHandleId === 'spouse-out';
   const addButtonLabel = isSpouseEdge ? 'Add Child' : 'Add More Children';
-  const labelColor = LABEL_COLORS[label] || '#888';
 
   return (
     <>
@@ -85,19 +63,6 @@ export default function DeletableEdge({
           className="nodrag nopan"
         >
           <div className={`edge-controls-container ${selected ? 'is-selected' : ''}`}>
-
-            {/* Relationship label pill — always visible if set */}
-            {label && (
-              <div
-                className="edge-label-pill"
-                style={{ background: labelColor }}
-                title={label}
-              >
-                {label}
-              </div>
-            )}
-
-            {/* Action menu — shown on hover/select */}
             <div className="edge-action-menu">
               <button
                 className="edge-menu-btn add"
@@ -115,51 +80,6 @@ export default function DeletableEdge({
 
               <div className="edge-menu-divider" />
 
-              {/* Label picker toggle — only for family/child edges */}
-              {!isSpouseEdge && (
-                <>
-                  <div className="edge-label-picker-wrap">
-                    <button
-                      className="edge-menu-btn label-btn"
-                      onClick={(e) => { e.stopPropagation(); setShowLabelPicker(v => !v); }}
-                      title="Set Relationship Label"
-                    >
-                      <Tag size={14} />
-                      <span>{label || 'Label'}</span>
-                    </button>
-
-                    {showLabelPicker && (
-                      <div className="edge-label-dropdown" onClick={e => e.stopPropagation()}>
-                        {RELATIONSHIP_LABELS.map(opt => (
-                          <button
-                            key={opt.value}
-                            className={`edge-label-option ${label === opt.value ? 'active' : ''}`}
-                            style={opt.value ? { '--opt-color': LABEL_COLORS[opt.value] } : {}}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.dispatchEvent(new CustomEvent('edge-set-label', {
-                                detail: { id, label: opt.value }
-                              }));
-                              setShowLabelPicker(false);
-                            }}
-                          >
-                            {opt.value && (
-                              <span
-                                className="edge-label-dot"
-                                style={{ background: LABEL_COLORS[opt.value] }}
-                              />
-                            )}
-                            {opt.display}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="edge-menu-divider" />
-                </>
-              )}
-
               <button
                 className="edge-menu-btn unlink"
                 onClick={(e) => {
@@ -174,7 +94,6 @@ export default function DeletableEdge({
                 <span>Unlink</span>
               </button>
             </div>
-
           </div>
         </div>
       </EdgeLabelRenderer>

@@ -603,7 +603,6 @@ body {
   transform: scale(0.8);
 }
 
-.react-flow__edge:hover .edge-controls-container,
 .edge-controls-container.is-selected {
   opacity: 1;
   transform: scale(1);

@@ -547,18 +547,7 @@ function FlowApp() {
     return () => window.removeEventListener('edge-unlink', handleUnlink);
   }, [setEdges, takeSnapshot]);
 
-  // Handle relationship label updates from DeletableEdge
-  useEffect(() => {
-    const handleSetLabel = (event) => {
-      const { id, label } = event.detail;
-      takeSnapshot();
-      setEdges((eds) => eds.map((e) =>
-        e.id === id ? { ...e, label: label || undefined } : e
-      ));
-    };
-    window.addEventListener('edge-set-label', handleSetLabel);
-    return () => window.removeEventListener('edge-set-label', handleSetLabel);
-  }, [setEdges, takeSnapshot]);
+
 
   // Handle adding person from edge
   useEffect(() => {
