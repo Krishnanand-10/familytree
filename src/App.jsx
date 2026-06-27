@@ -1292,18 +1292,9 @@ function FlowApp() {
             onSwitch={switchBranch}
             onCreate={createBranch}
             onDelete={deleteBranch}
+            treeName={treeName}
+            setTreeName={setTreeName}
           />
-
-          <div className="k-divider-v" />
-
-          <input
-            className="k-tree-name"
-            value={treeName}
-            onChange={(e) => setTreeName(e.target.value)}
-            placeholder="Untitled Tree"
-          />
-
-          <div className="k-divider-v" />
 
           <div className={`db-status-badge ${dbStatus}`}>
             <span className="db-status-dot" />
