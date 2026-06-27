@@ -1329,23 +1329,27 @@ function FlowApp() {
         </div>
 
         <div className="k-header-right">
-          <button className="k-tool-btn" onClick={undo} title="Undo (Ctrl+Z)" disabled={history.length === 0}>
-            <Undo2 size={16} />
-          </button>
-          <button className="k-tool-btn" onClick={redo} title="Redo (Ctrl+Y)" disabled={redoStack.length === 0}>
-            <Redo2 size={16} />
-          </button>
+          <div className="k-btn-group">
+            <button className="k-tool-btn" onClick={undo} title="Undo (Ctrl+Z)" disabled={history.length === 0}>
+              <Undo2 size={15} />
+            </button>
+            <button className="k-tool-btn" onClick={redo} title="Redo (Ctrl+Y)" disabled={redoStack.length === 0}>
+              <Redo2 size={15} />
+            </button>
+          </div>
 
           <div className="k-divider-v" />
 
           <button className="k-tool-btn accent" onClick={rearrangeEverything} title="Magic Align">
-            <Wand2 size={16} />
+            <Wand2 size={15} />
             <span>Align</span>
           </button>
 
           <button className="k-tool-btn danger" onClick={handleClearTree} title="Clear entire tree">
-            <Trash2 size={16} />
+            <Trash2 size={15} />
           </button>
+
+          <div className="k-divider-v" />
 
           {/* Export dropdown */}
           <div className="export-dropdown-wrap">
@@ -1354,8 +1358,8 @@ function FlowApp() {
               onClick={() => setShowExportMenu(v => !v)}
               title="Export"
             >
-              <Download size={16} />
-              <span style={{ fontSize: 11 }}>Export</span>
+              <Download size={15} />
+              <span>Export</span>
             </button>
             {showExportMenu && (
               <div className="export-dropdown" onMouseLeave={() => setShowExportMenu(false)}>
@@ -1373,7 +1377,7 @@ function FlowApp() {
           </div>
 
           <button className="k-tool-btn" onClick={handleImportClick} title="Import Backup (JSON)">
-            <Upload size={16} />
+            <Upload size={15} />
             <input
               type="file"
               ref={fileInputRef}
@@ -1390,6 +1394,7 @@ function FlowApp() {
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
         </div>
+
       </header>
 
       <main style={{ flex: 1, position: 'relative' }}>
