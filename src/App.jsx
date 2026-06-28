@@ -300,11 +300,18 @@ function layoutTree(nodes, edges) {
     rootX += mainW + H_GAP;
   });
 
-  // --- Place any unpositioned members (disconnected nodes) ---
+  // --- Place any unpositioned members (disconnected nodes) below the lowest positioned node ---
+  let maxY = 0;
+  newNodes.forEach(node => {
+    if (positioned.has(node.id) && node.position.y > maxY) {
+      maxY = node.position.y;
+    }
+  });
+
   let floatX = 0;
   newNodes.forEach((node, i) => {
      if (node.type === 'member' && !positioned.has(node.id)) {
-       newNodes[i] = { ...node, position: { x: floatX, y: 0 } };
+       newNodes[i] = { ...node, position: { x: floatX, y: maxY + (maxY > 0 ? V_GAP : 0) } };
        floatX += UNIT;
      }
   });
@@ -334,7 +341,7 @@ function layoutTree(nodes, edges) {
 
 // Inner component that can use useReactFlow()
 function FlowApp() {
-  const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
+  const { screenToFlowPosition, fitView, setCenter, getViewport } = useReactFlow();
 
   // ── Branch Management ──────────────────────────────────────────────────────
   const DEFAULT_BRANCH_ID = 'default';
@@ -387,6 +394,8 @@ function FlowApp() {
 
 
 
+
+
   const handleSaveClick = useCallback(async () => {
     setIsSaving(true);
     
@@ -402,7 +411,7 @@ function FlowApp() {
     localStorage.setItem('family-tree-edges', JSON.stringify(edges));
 
     try {
-      const res = await fetch('http://localhost:5000/api/tree', {
+      const res = await fetch(`http://localhost:5000/api/tree?branchId=${activeBranchId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodes, edges })
@@ -424,7 +433,7 @@ function FlowApp() {
       setIsSaving(false);
       setTimeout(() => setShowSaveToast(false), 3000);
     }
-  }, [nodes, edges, treeName]);
+  }, [nodes, edges, treeName, activeBranchId, branches, nodesKey, edgesKey]);
 
   // Track latest nodes/edges for cleanup logic to avoid stale closures
   const nodesRef = useRef(nodes);
@@ -438,34 +447,48 @@ function FlowApp() {
   const [redoStack, setRedoStack] = useState([]);
 
   const takeSnapshot = useCallback(() => {
-    setHistory((prev) => [...prev.slice(-49), { nodes, edges }]); // Keep last 50 states
+    setHistory((prev) => [...prev.slice(-49), { nodes: nodesRef.current, edges: edgesRef.current }]); // Keep last 50 states
     setRedoStack([]);
-  }, [nodes, edges]);
+  }, []);
 
   const undo = useCallback(() => {
     if (history.length === 0) return;
     const prevState = history[history.length - 1];
-    setRedoStack((prev) => [...prev, { nodes, edges }]);
+    setRedoStack((prev) => [...prev, { nodes: nodesRef.current, edges: edgesRef.current }]);
     setNodes(prevState.nodes);
     setEdges(prevState.edges);
     setHistory((prev) => prev.slice(0, -1));
-  }, [history, nodes, edges, setNodes, setEdges]);
+  }, [history, setNodes, setEdges]);
 
   const redo = useCallback(() => {
     if (redoStack.length === 0) return;
     const nextState = redoStack[redoStack.length - 1];
-    setHistory((prev) => [...prev, { nodes, edges }]);
+    setHistory((prev) => [...prev, { nodes: nodesRef.current, edges: edgesRef.current }]);
     setNodes(nextState.nodes);
     setEdges(nextState.edges);
     setRedoStack((prev) => prev.slice(0, -1));
-  }, [redoStack, nodes, edges, setNodes, setEdges]);
+  }, [redoStack, setNodes, setEdges]);
 
-  // Save branch name when treeName changes
-  useEffect(() => {
-    const updatedBranches = branches.map(b => b.id === activeBranchId ? { ...b, name: treeName } : b);
+  const handleTreeNameChange = useCallback(async (newName) => {
+    setTreeName(newName);
+    
+    const updatedBranches = branches.map(b => b.id === activeBranchId ? { ...b, name: newName } : b);
     setBranches(updatedBranches);
     localStorage.setItem('family-tree-branches', JSON.stringify(updatedBranches));
-  }, [treeName]); // eslint-disable-line
+
+    // Persist branch rename to backend if database is online
+    if (dbStatus === 'connected') {
+      try {
+        await fetch('http://localhost:5000/api/branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: activeBranchId, name: newName })
+        });
+      } catch (err) {
+        console.warn('Kinship: Could not sync branch rename to database.', err);
+      }
+    }
+  }, [activeBranchId, branches, dbStatus]);
 
   // Save to localStorage (branch-specific) when tree changes
   useEffect(() => {
@@ -473,60 +496,7 @@ function FlowApp() {
     localStorage.setItem(edgesKey, JSON.stringify(edges));
   }, [nodes, edges, nodesKey, edgesKey]);
 
-  // ── Branch handlers ─────────────────────────────────────────────────────────
-  const switchBranch = useCallback((branchId) => {
-    // Save current branch first
-    localStorage.setItem(nodesKey, JSON.stringify(nodes));
-    localStorage.setItem(edgesKey, JSON.stringify(edges));
 
-    // Load new branch
-    const newNodesKey = `family-tree-nodes-${branchId}`;
-    const newEdgesKey = `family-tree-edges-${branchId}`;
-    const savedNodes = localStorage.getItem(newNodesKey);
-    const savedEdges = localStorage.getItem(newEdgesKey);
-    const parsedNodes = savedNodes ? JSON.parse(savedNodes) : [];
-    const parsedEdges = savedEdges ? JSON.parse(savedEdges) : [];
-    const { nodes: mN, edges: mE } = migrateLegacyIds(parsedNodes, parsedEdges);
-
-    setNodes(mN);
-    setEdges(mE);
-    setActiveBranchId(branchId);
-    localStorage.setItem('family-tree-active-branch', branchId);
-
-    const branch = branches.find(b => b.id === branchId);
-    if (branch) setTreeName(branch.name);
-
-    setTimeout(() => fitView({ duration: 600, padding: 0.2 }), 200);
-  }, [nodesKey, edgesKey, nodes, edges, branches, setNodes, setEdges, fitView]);
-
-  const createBranch = useCallback((name) => {
-    const newId = crypto.randomUUID();
-    const newBranch = { id: newId, name };
-    const updated = [...branches, newBranch];
-    setBranches(updated);
-    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
-    // Save current branch
-    localStorage.setItem(nodesKey, JSON.stringify(nodes));
-    localStorage.setItem(edgesKey, JSON.stringify(edges));
-    // Switch to new empty branch
-    setNodes([]);
-    setEdges([]);
-    setActiveBranchId(newId);
-    localStorage.setItem('family-tree-active-branch', newId);
-    setTreeName(name);
-  }, [branches, nodesKey, edgesKey, nodes, edges, setNodes, setEdges]);
-
-  const deleteBranch = useCallback((branchId) => {
-    const updated = branches.filter(b => b.id !== branchId);
-    setBranches(updated);
-    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
-    localStorage.removeItem(`family-tree-nodes-${branchId}`);
-    localStorage.removeItem(`family-tree-edges-${branchId}`);
-    // If deleting active branch, switch to first remaining
-    if (branchId === activeBranchId && updated.length > 0) {
-      switchBranch(updated[0].id);
-    }
-  }, [branches, activeBranchId, switchBranch]);
 
 
   // Modal State
@@ -627,7 +597,7 @@ function FlowApp() {
 
   // Cleanup and migrate old edges to junctions
 
-  const cleanupTree = useCallback((shouldRearrange = false) => {
+  const cleanupTree = useCallback((shouldRearrange = false, focusNodeId = null) => {
     let hasChanged = false;
     let newEdges = [...edgesRef.current];
     let newNodes = [...nodesRef.current];
@@ -699,7 +669,7 @@ function FlowApp() {
         if (pA && pB) {
           const junctionId = `j-${pA.id}-${pB.id}`;
           const jX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 6);
-          const jY = Math.round(Math.max(pA.position.y, pB.position.y) + 200);
+          const jY = Math.round(Math.max(pA.position.y, pB.position.y) + 240);
           
           if (!newNodes.find(n => n.id === junctionId)) {
             newNodes.push({ id: junctionId, type: 'junction', position: { x: jX, y: jY }, data: {} });
@@ -754,7 +724,7 @@ function FlowApp() {
         const node = newNodes.find(n => n.id === pair.junctionId);
         if (pA && pB && node) {
           const targetX = Math.round((pA.position.x + pB.position.x) / 2 + 80 - 10);
-          const targetY = Math.round(Math.max(pA.position.y, pB.position.y) + 200);
+          const targetY = Math.round(Math.max(pA.position.y, pB.position.y) + 240);
           if (Math.abs(node.position.x - targetX) > 1 || Math.abs(node.position.y - targetY) > 1) {
             const idx = newNodes.findIndex(n => n.id === node.id);
             newNodes[idx] = { ...node, position: { x: targetX, y: targetY } };
@@ -813,7 +783,7 @@ function FlowApp() {
         if (parentNode) {
           centerX = parentNode.position.x + (parentNode.type === 'member' ? 80 : 6);
           // If parent is a junction, children should be exactly 80px below the junction branching point
-          // If parent is a member, children should be 280px below (standard generation height)
+          // If parent is a member, children should be 300px below (standard generation height)
           targetY = parentNode.position.y + (parentNode.type === 'junction' ? 80 : 300);
         } else {
           // Fallback to maxY if no parent found (shouldn't happen)
@@ -902,41 +872,213 @@ function FlowApp() {
       setEdges(newEdges);
       takeSnapshot();
       if (shouldRearrange) {
-        setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 100);
+        if (focusNodeId) {
+          const targetNode = newNodes.find(n => n.id === focusNodeId);
+          if (targetNode) {
+            setTimeout(() => {
+              const { x: vpX, y: vpY, zoom } = getViewport();
+              const minX = -vpX / zoom;
+              const maxX = (-vpX + window.innerWidth) / zoom;
+              const minY = -vpY / zoom;
+              const maxY = (-vpY + window.innerHeight) / zoom;
+
+              // Check if the newly added node is off-screen
+              const isVisible = 
+                targetNode.position.x >= minX &&
+                targetNode.position.x + 160 <= maxX &&
+                targetNode.position.y >= minY &&
+                targetNode.position.y + 80 <= maxY;
+
+              if (!isVisible) {
+                // If it is off-screen, smoothly fit view to bring it into view
+                fitView({ duration: 600, padding: 0.25 });
+              }
+            }, 150);
+          }
+        } else {
+          setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 150);
+        }
       }
     }
-  }, [setNodes, setEdges, takeSnapshot, fitView]);
+  }, [setNodes, setEdges, takeSnapshot, fitView, getViewport]);
 
-  // Fetch family tree from API on mount, with LocalStorage fallback
-  useEffect(() => {
-    const loadTree = async () => {
+  // Helper to fetch family tree from database or local storage
+  const fetchTreeForBranch = useCallback(async (branchId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/tree?branchId=${branchId}`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      
+      if (data.nodes && data.edges) {
+        return { nodes: data.nodes, edges: data.edges, status: 'connected' };
+      }
+    } catch (err) {
+      console.warn(`Kinship: Failed to load branch ${branchId} from database. Using local storage.`, err);
+    }
+    
+    // Fallback: Load from local storage
+    const newNodesKey = `family-tree-nodes-${branchId}`;
+    const newEdgesKey = `family-tree-edges-${branchId}`;
+    const savedNodes = localStorage.getItem(newNodesKey) || localStorage.getItem('family-tree-nodes');
+    const savedEdges = localStorage.getItem(newEdgesKey) || localStorage.getItem('family-tree-edges');
+    const parsedNodes = savedNodes ? JSON.parse(savedNodes) : (branchId === DEFAULT_BRANCH_ID ? initialNodes : []);
+    const parsedEdges = savedEdges ? JSON.parse(savedEdges) : (branchId === DEFAULT_BRANCH_ID ? initialEdges : []);
+    const { nodes: mN, edges: mE } = migrateLegacyIds(parsedNodes, parsedEdges);
+    return { nodes: mN, edges: mE, status: 'fallback' };
+  }, []);
+
+  // Load a branch's tree with local storage fallback (used on startup mount)
+  const loadTreeForBranch = useCallback(async (branchId) => {
+    const { nodes: newNodes, edges: newEdges, status } = await fetchTreeForBranch(branchId);
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setDbStatus(prev => prev === 'connected' ? 'connected' : status);
+    setTimeout(() => cleanupTree(true), 150);
+  }, [fetchTreeForBranch, setNodes, setEdges, cleanupTree]);
+
+  // ── Branch handlers ─────────────────────────────────────────────────────────
+  const switchBranch = useCallback(async (branchId) => {
+    // Save current branch first using current keys
+    localStorage.setItem(nodesKey, JSON.stringify(nodes));
+    localStorage.setItem(edgesKey, JSON.stringify(edges));
+
+    // Load new branch data first (asynchronously) before changing activeBranchId
+    const { nodes: newNodes, edges: newEdges, status } = await fetchTreeForBranch(branchId);
+
+    // Update all states together in a single batch to prevent visual flickering and data leakage
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setActiveBranchId(branchId);
+    localStorage.setItem('family-tree-active-branch', branchId);
+    setDbStatus(prev => prev === 'connected' ? 'connected' : status);
+
+    const branch = branches.find(b => b.id === branchId);
+    if (branch) setTreeName(branch.name);
+
+    setTimeout(() => fitView({ duration: 600, padding: 0.2 }), 200);
+    setTimeout(() => cleanupTree(true), 250);
+  }, [nodesKey, edgesKey, nodes, edges, branches, setTreeName, fetchTreeForBranch, setNodes, setEdges, fitView, cleanupTree]);
+
+  const createBranch = useCallback(async (name) => {
+    const newId = crypto.randomUUID();
+    const newBranch = { id: newId, name };
+    
+    // Save locally
+    const updated = [...branches, newBranch];
+    setBranches(updated);
+    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
+    localStorage.setItem(nodesKey, JSON.stringify(nodes));
+    localStorage.setItem(edgesKey, JSON.stringify(edges));
+
+    // Save to backend database
+    if (dbStatus === 'connected') {
       try {
-        const res = await fetch('http://localhost:5000/api/tree');
-        if (!res.ok) {
-          throw new Error(`Server returned ${res.status}`);
-        }
-        const data = await res.json();
-        
-        if (data.nodes && data.edges) {
-          setNodes(data.nodes);
-          setEdges(data.edges);
-          setDbStatus('connected');
-          console.log('Kinship: Loaded family tree from database server.');
-          
-          // Trigger family tree auto-alignment layout cleanup
-          setTimeout(() => cleanupTree(true), 300);
-        } else {
-          setDbStatus('fallback');
+        await fetch('http://localhost:5000/api/branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newBranch)
+        });
+      } catch (err) {
+        console.warn('Kinship: Could not sync new branch to database.', err);
+      }
+    }
+
+    // Switch to new empty branch
+    setNodes([]);
+    setEdges([]);
+    setActiveBranchId(newId);
+    localStorage.setItem('family-tree-active-branch', newId);
+    setTreeName(name);
+  }, [branches, nodesKey, edgesKey, nodes, edges, setNodes, setEdges, dbStatus]);
+
+  const deleteBranch = useCallback(async (branchId) => {
+    const updated = branches.filter(b => b.id !== branchId);
+    setBranches(updated);
+    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
+    localStorage.removeItem(`family-tree-nodes-${branchId}`);
+    localStorage.removeItem(`family-tree-edges-${branchId}`);
+
+    // Delete from backend database
+    if (dbStatus === 'connected') {
+      try {
+        await fetch(`http://localhost:5000/api/branches/${branchId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.warn('Kinship: Could not sync branch deletion to database.', err);
+      }
+    }
+
+    // If deleting active branch, switch to first remaining
+    if (branchId === activeBranchId && updated.length > 0) {
+      switchBranch(updated[0].id);
+    }
+  }, [branches, activeBranchId, switchBranch, dbStatus]);
+
+  // Load branches list and then active tree branch on mount
+  useEffect(() => {
+    const initializeApp = async () => {
+      let isDbConnected = false;
+      let dbBranches = [];
+      try {
+        const res = await fetch('http://localhost:5000/api/branches');
+        if (res.ok) {
+          dbBranches = await res.json();
+          if (dbBranches && dbBranches.length > 0) {
+            setBranches(dbBranches);
+            localStorage.setItem('family-tree-branches', JSON.stringify(dbBranches));
+            isDbConnected = true;
+          }
         }
       } catch (err) {
-        console.warn('Kinship: Could not connect to API server. Falling back to local storage.', err);
+        console.warn('Kinship: Could not fetch branches from database.', err);
+      }
+
+      const activeId = localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID;
+      
+      if (isDbConnected) {
+        setDbStatus('connected');
+        // Check if our active branch is in the database branches list. If not, add/upsert it
+        const currentActiveBranch = dbBranches.find(b => b.id === activeId || (activeId === 'default' && b.id === '00000000-0000-0000-0000-000000000000'));
+        if (!currentActiveBranch) {
+          // Sync current branch metadata to backend
+          const localBranch = JSON.parse(localStorage.getItem('family-tree-branches') || '[]').find(b => b.id === activeId) || { id: activeId, name: treeName };
+          try {
+            await fetch('http://localhost:5000/api/branches', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(localBranch)
+            });
+            // Reload branches
+            const reloadRes = await fetch('http://localhost:5000/api/branches');
+            if (reloadRes.ok) {
+              const latestBranches = await reloadRes.json();
+              setBranches(latestBranches);
+              localStorage.setItem('family-tree-branches', JSON.stringify(latestBranches));
+            }
+          } catch (e) {
+            console.error('Failed to sync new active branch to database', e);
+          }
+        }
+        await loadTreeForBranch(activeId);
+      } else {
         setDbStatus('fallback');
+        // Fallback: load tree from local storage
+        const newNodesKey = `family-tree-nodes-${activeId}`;
+        const newEdgesKey = `family-tree-edges-${activeId}`;
+        const savedNodes = localStorage.getItem(newNodesKey) || localStorage.getItem('family-tree-nodes');
+        const savedEdges = localStorage.getItem(newEdgesKey) || localStorage.getItem('family-tree-edges');
+        const parsedNodes = savedNodes ? JSON.parse(savedNodes) : (activeId === DEFAULT_BRANCH_ID ? initialNodes : []);
+        const parsedEdges = savedEdges ? JSON.parse(savedEdges) : (activeId === DEFAULT_BRANCH_ID ? initialEdges : []);
+        const { nodes: mN, edges: mE } = migrateLegacyIds(parsedNodes, parsedEdges);
+        setNodes(mN);
+        setEdges(mE);
       }
     };
 
-    loadTree();
+    initializeApp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges]); // cleanupTree not listed as dependency because of ref updates
+  }, [loadTreeForBranch]);
 
   const rearrangeEverything = useCallback(() => {
     takeSnapshot();
@@ -1138,6 +1280,7 @@ function FlowApp() {
 
   const handleSaveMember = (formData) => {
     takeSnapshot();
+    let newId = null;
     if (modalState.mode === 'edit') {
       setNodes((nds) =>
         nds.map((node) => {
@@ -1152,7 +1295,7 @@ function FlowApp() {
       );
     } else {
       // Generate a stable unique ID (UUID for database compatibility)
-      const newId = crypto.randomUUID();
+      newId = crypto.randomUUID();
       const parentNode = nodes.find((n) => n.id === modalState.activeMemberId);
 
       let x, y;
@@ -1253,7 +1396,7 @@ function FlowApp() {
       }
     }
     setModalState({ isOpen: false, mode: 'add', activeMemberId: null, relativeType: null });
-    setTimeout(() => cleanupTree(true), 100);
+    setTimeout(() => cleanupTree(true, newId), 100);
   };
 
   const onNodeDrag = useCallback((event, draggedNode) => {
@@ -1326,7 +1469,7 @@ function FlowApp() {
             onCreate={createBranch}
             onDelete={deleteBranch}
             treeName={treeName}
-            setTreeName={setTreeName}
+            setTreeName={handleTreeNameChange}
           />
 
           <div className={`db-status-badge ${dbStatus}`}>
@@ -1485,13 +1628,15 @@ function FlowApp() {
       />
 
       {/* Relationship Finder */}
-      <RelationFinder
-        isOpen={relationFinderState.isOpen}
-        fromMemberId={relationFinderState.fromMemberId}
-        nodes={nodes}
-        edges={edges}
-        onClose={() => setRelationFinderState({ isOpen: false, fromMemberId: null })}
-      />
+      {relationFinderState.isOpen && (
+        <RelationFinder
+          isOpen={relationFinderState.isOpen}
+          fromMemberId={relationFinderState.fromMemberId}
+          nodes={nodes}
+          edges={edges}
+          onClose={() => setRelationFinderState({ isOpen: false, fromMemberId: null })}
+        />
+      )}
 
       {/* Save Toast */}
       <AnimatePresence>

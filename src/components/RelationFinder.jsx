@@ -276,12 +276,8 @@ export default function RelationFinder({ isOpen, fromMemberId, nodes, edges, onC
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setSearch('');
-      setSelectedId(null);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen, fromMemberId]);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [fromMemberId]);
 
   const fromMember = useMemo(
     () => nodes.find(n => n.id === fromMemberId),

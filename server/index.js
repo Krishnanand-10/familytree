@@ -32,9 +32,91 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// GET: Fetch all family branches
+app.get('/api/branches', async (req, res) => {
+  if (!supabase) {
+    return res.status(503).json({
+      error: 'Database not configured.',
+    });
+  }
+  try {
+    const { data: branches, error } = await supabase
+      .from('family_branches')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    res.json(branches || []);
+  } catch (error) {
+    console.error('Error fetching branches:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST: Upsert a family branch (create or rename)
+app.post('/api/branches', async (req, res) => {
+  const { id, name } = req.body;
+  if (!supabase) {
+    return res.status(503).json({
+      error: 'Database not configured.',
+    });
+  }
+
+  let dbId = id;
+  if (dbId === 'default') {
+    dbId = DEFAULT_BRANCH_ID;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('family_branches')
+      .upsert({
+        id: dbId,
+        name: name || 'Unnamed Tree',
+      })
+      .select();
+
+    if (error) throw error;
+    res.json({ success: true, data: data?.[0] });
+  } catch (error) {
+    console.error('Error saving branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE: Delete a family branch (cascades to people and relationships)
+app.delete('/api/branches/:id', async (req, res) => {
+  let branchId = req.params.id;
+  if (!supabase) {
+    return res.status(503).json({
+      error: 'Database not configured.',
+    });
+  }
+
+  if (branchId === 'default') {
+    branchId = DEFAULT_BRANCH_ID;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('family_branches')
+      .delete()
+      .eq('id', branchId);
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Branch deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET: Load family tree nodes and edges from Supabase
 app.get('/api/tree', async (req, res) => {
-  const branchId = req.query.branchId || DEFAULT_BRANCH_ID;
+  let branchId = req.query.branchId || DEFAULT_BRANCH_ID;
+  if (branchId === 'default') {
+    branchId = DEFAULT_BRANCH_ID;
+  }
 
   if (!supabase) {
     return res.status(503).json({
@@ -116,7 +198,10 @@ app.get('/api/tree', async (req, res) => {
 // POST: Save/Sync the client React Flow tree state back to Supabase
 app.post('/api/tree', async (req, res) => {
   const { nodes, edges } = req.body;
-  const branchId = req.query.branchId || DEFAULT_BRANCH_ID;
+  let branchId = req.query.branchId || DEFAULT_BRANCH_ID;
+  if (branchId === 'default') {
+    branchId = DEFAULT_BRANCH_ID;
+  }
 
   if (!supabase) {
     return res.status(503).json({
@@ -239,7 +324,7 @@ app.post('/api/tree', async (req, res) => {
       const { error: deleteRelErr } = await supabase
         .from('relationships')
         .delete()
-        .in('person_a', dbPeopleIds);
+        .or(`person_a.in.(${dbPeopleIds.join(',')}),person_b.in.(${dbPeopleIds.join(',')})`);
 
       if (deleteRelErr) throw deleteRelErr;
     }

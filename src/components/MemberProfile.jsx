@@ -1,35 +1,8 @@
 import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Edit2, GitBranch, MapPin, Globe, User, FileText, Heart, Shield, Calendar, Users, ChevronRight } from 'lucide-react';
+import { X, Edit2, GitBranch, MapPin, Globe, User, FileText, Calendar, Users, ChevronRight } from 'lucide-react';
 
 export default function MemberProfile({ isOpen, member, nodes, edges, onClose, onEdit, onFindRelation, onSelectMember }) {
-  if (!member) return null;
-
-  const {
-    name, gender, birthYear, deathYear,
-    imageUrl, isAlive, notes, birthPlace, nationality
-  } = member.data;
-
-  const accentColor =
-    gender === 'female' ? '#e91e63' :
-    gender === 'other'  ? '#9c27b0' : '#2196f3';
-
-  const genderSymbol =
-    gender === 'female' ? '♀' :
-    gender === 'other'  ? '⚥' : '♂';
-
-  const genderLabel =
-    gender === 'female' ? 'Female' :
-    gender === 'other'  ? 'Other' : 'Male';
-
-  const lifespan = (() => {
-    const parts = [];
-    if (birthYear) parts.push(birthYear);
-    if (deathYear) parts.push(`† ${deathYear}`);
-    else if (birthYear) parts.push('Present');
-    return parts.join('  –  ');
-  })();
-
   // ── Calculate Relatives ────────────────────────────────────────────────────
   const relatives = useMemo(() => {
     if (!member || !nodes || !edges) return { parents: [], children: [], spouses: [] };
@@ -101,6 +74,33 @@ export default function MemberProfile({ isOpen, member, nodes, edges, onClose, o
 
     return { parents, children, spouses };
   }, [member, nodes, edges]);
+
+  if (!member) return null;
+
+  const {
+    name, gender, birthYear, deathYear,
+    imageUrl, isAlive, notes, birthPlace, nationality
+  } = member.data;
+
+  const accentColor =
+    gender === 'female' ? '#e91e63' :
+    gender === 'other'  ? '#9c27b0' : '#2196f3';
+
+  const genderSymbol =
+    gender === 'female' ? '♀' :
+    gender === 'other'  ? '⚥' : '♂';
+
+  const genderLabel =
+    gender === 'female' ? 'Female' :
+    gender === 'other'  ? 'Other' : 'Male';
+
+  const lifespan = (() => {
+    const parts = [];
+    if (birthYear) parts.push(birthYear);
+    if (deathYear) parts.push(`† ${deathYear}`);
+    else if (birthYear) parts.push('Present');
+    return parts.join('  –  ');
+  })();
 
   return (
     <AnimatePresence>

@@ -30,6 +30,45 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
     };
   });
 
+  const [prevIsOpen, setPrevIsOpen] = useState(false);
+  const [prevMemberId, setPrevMemberId] = useState(null);
+  const [prevMode, setPrevMode] = useState(null);
+
+  const currentMemberId = member?.id || null;
+  if (isOpen !== prevIsOpen || (isOpen && (currentMemberId !== prevMemberId || mode !== prevMode))) {
+    setPrevIsOpen(isOpen);
+    setPrevMemberId(currentMemberId);
+    setPrevMode(mode);
+
+    if (isOpen) {
+      if (mode === 'edit' && member) {
+        setFormData({
+          name: member.data.name || '',
+          birthYear: member.data.birthYear || '',
+          deathYear: member.data.deathYear || '',
+          gender: member.data.gender || 'male',
+          imageUrl: member.data.imageUrl || '',
+          isAlive: member.data.isAlive !== undefined ? member.data.isAlive : !member.data.deathYear,
+          notes: member.data.notes || '',
+          birthPlace: member.data.birthPlace || '',
+          nationality: member.data.nationality || '',
+        });
+      } else {
+        setFormData({
+          name: '',
+          birthYear: '',
+          deathYear: '',
+          gender: 'male',
+          imageUrl: '',
+          isAlive: true,
+          notes: '',
+          birthPlace: '',
+          nationality: '',
+        });
+      }
+    }
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(formData);
