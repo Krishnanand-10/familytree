@@ -75,9 +75,7 @@ export default function FamilyEdge({
                 className="edge-menu-btn unlink"
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (window.confirm('Unlink this child?')) {
-                    window.dispatchEvent(new CustomEvent('edge-unlink', { detail: { id } }));
-                  }
+                  window.dispatchEvent(new CustomEvent('edge-unlink', { detail: { id, type: 'family' } }));
                 }}
               >
                 <X size={14} />

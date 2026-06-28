@@ -25,6 +25,7 @@ import { initialNodes, initialEdges } from './data';
 import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BranchSwitcher from './components/BranchSwitcher';
+import CustomDialog from './components/CustomDialog';
 
 const nodeTypes = {
   member: MemberNode,
@@ -543,17 +544,72 @@ function FlowApp() {
     fromMemberId: null,
   });
 
-  // Handle unlinking via custom event from DeletableEdge
+  // Custom Dialog State
+  const [customDialog, setCustomDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'confirm',
+    onConfirm: null,
+    onCancel: null,
+  });
+
+  const triggerConfirm = useCallback((title, message, onConfirm, onCancel = null) => {
+    setCustomDialog({
+      isOpen: true,
+      title,
+      message,
+      type: 'confirm',
+      onConfirm: () => {
+        onConfirm();
+        setCustomDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      onCancel: () => {
+        if (onCancel) onCancel();
+        setCustomDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  }, []);
+
+  const triggerAlert = useCallback((title, message, onClose = null) => {
+    setCustomDialog({
+      isOpen: true,
+      title,
+      message,
+      type: 'alert',
+      onConfirm: () => {
+        if (onClose) onClose();
+        setCustomDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      onCancel: () => {
+        if (onClose) onClose();
+        setCustomDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  }, []);
+
+  // Handle unlinking via custom event from Edges
   useEffect(() => {
     const handleUnlink = (event) => {
-      const { id } = event.detail;
-      takeSnapshot();
-      setEdges((eds) => eds.filter((e) => e.id !== id));
+      const { id, type } = event.detail;
+      let msg = 'Are you sure you want to remove this connection?';
+      if (type === 'family') msg = 'Are you sure you want to unlink this child?';
+      if (type === 'marriage' || type === 'spouse') msg = 'Are you sure you want to remove this marriage link?';
+      if (type === 'deletable') msg = 'Are you sure you want to unlink these two people?';
+
+      triggerConfirm(
+        'Remove Connection',
+        msg,
+        () => {
+          takeSnapshot();
+          setEdges((eds) => eds.filter((e) => e.id !== id));
+        }
+      );
     };
 
     window.addEventListener('edge-unlink', handleUnlink);
     return () => window.removeEventListener('edge-unlink', handleUnlink);
-  }, [setEdges, takeSnapshot]);
+  }, [setEdges, takeSnapshot, triggerConfirm]);
 
 
 
@@ -1004,29 +1060,35 @@ function FlowApp() {
     setTreeName(name);
   }, [branches, nodesKey, edgesKey, nodes, edges, setNodes, setEdges, dbStatus]);
 
-  const deleteBranch = useCallback(async (branchId) => {
-    const updated = branches.filter(b => b.id !== branchId);
-    setBranches(updated);
-    localStorage.setItem('family-tree-branches', JSON.stringify(updated));
-    localStorage.removeItem(`family-tree-nodes-${branchId}`);
-    localStorage.removeItem(`family-tree-edges-${branchId}`);
+  const deleteBranch = useCallback(async (branchId, branchName) => {
+    triggerConfirm(
+      'Delete Tree',
+      `Are you sure you want to delete "${branchName}"? This cannot be undone.`,
+      async () => {
+        const updated = branches.filter(b => b.id !== branchId);
+        setBranches(updated);
+        localStorage.setItem('family-tree-branches', JSON.stringify(updated));
+        localStorage.removeItem(`family-tree-nodes-${branchId}`);
+        localStorage.removeItem(`family-tree-edges-${branchId}`);
 
-    // Delete from backend database
-    if (dbStatus === 'connected') {
-      try {
-        await fetch(`http://localhost:5000/api/branches/${branchId}`, {
-          method: 'DELETE'
-        });
-      } catch (err) {
-        console.warn('Kinship: Could not sync branch deletion to database.', err);
+        // Delete from backend database
+        if (dbStatus === 'connected') {
+          try {
+            await fetch(`http://localhost:5000/api/branches/${branchId}`, {
+              method: 'DELETE'
+            });
+          } catch (err) {
+            console.warn('Kinship: Could not sync branch deletion to database.', err);
+          }
+        }
+
+        // If deleting active branch, switch to first remaining
+        if (branchId === activeBranchId && updated.length > 0) {
+          switchBranch(updated[0].id);
+        }
       }
-    }
-
-    // If deleting active branch, switch to first remaining
-    if (branchId === activeBranchId && updated.length > 0) {
-      switchBranch(updated[0].id);
-    }
-  }, [branches, activeBranchId, switchBranch, dbStatus]);
+    );
+  }, [branches, activeBranchId, switchBranch, dbStatus, triggerConfirm]);
 
   // Load branches list and then active tree branch on mount
   useEffect(() => {
@@ -1162,23 +1224,31 @@ function FlowApp() {
   }, [nodes, setCenter]);
 
   const handleDelete = useCallback((memberId) => {
-    if (window.confirm('Are you sure you want to remove this person?')) {
-      takeSnapshot();
-      setNodes((nds) => nds.filter((n) => n.id !== memberId));
-      setEdges((eds) => eds.filter((e) => e.source !== memberId && e.target !== memberId));
-      setModalState({ isOpen: false, mode: 'add', activeMemberId: null, relativeType: null });
-      setTimeout(() => cleanupTree(true), 100);
-    }
-  }, [setNodes, setEdges, takeSnapshot, cleanupTree]);
+    triggerConfirm(
+      'Remove Person',
+      'Are you sure you want to remove this person from the family tree?',
+      () => {
+        takeSnapshot();
+        setNodes((nds) => nds.filter((n) => n.id !== memberId));
+        setEdges((eds) => eds.filter((e) => e.source !== memberId && e.target !== memberId));
+        setModalState({ isOpen: false, mode: 'add', activeMemberId: null, relativeType: null });
+        setTimeout(() => cleanupTree(true), 100);
+      }
+    );
+  }, [setNodes, setEdges, takeSnapshot, cleanupTree, triggerConfirm]);
 
   const handleClearTree = () => {
-    if (window.confirm('This will delete your entire tree. Are you sure?')) {
-      takeSnapshot();
-      setNodes([]);
-      setEdges([]);
-      localStorage.removeItem('family-tree-nodes');
-      localStorage.removeItem('family-tree-edges');
-    }
+    triggerConfirm(
+      'Clear Tree',
+      'This will delete your entire active family tree. Are you sure you want to proceed?',
+      () => {
+        takeSnapshot();
+        setNodes([]);
+        setEdges([]);
+        localStorage.removeItem('family-tree-nodes');
+        localStorage.removeItem('family-tree-edges');
+      }
+    );
   };
   const handleExportTree = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(
@@ -1217,7 +1287,7 @@ function FlowApp() {
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (err) {
-      alert('Export failed: ' + err.message);
+      triggerAlert('Export Error', 'Export failed: ' + err.message);
     }
   };
 
@@ -1244,7 +1314,7 @@ function FlowApp() {
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
       pdf.save(`${treeName.replace(/\s+/g, '_')}_tree.pdf`);
     } catch (err) {
-      alert('PDF export failed: ' + err.message);
+      triggerAlert('PDF Export Error', 'PDF export failed: ' + err.message);
     }
   };
 
@@ -1261,30 +1331,35 @@ function FlowApp() {
       try {
         const data = JSON.parse(event.target.result);
         if (!data.nodes || !data.edges) {
-          alert("Invalid backup file: 'nodes' or 'edges' data is missing.");
+          triggerAlert("Invalid Backup", "Invalid backup file: 'nodes' or 'edges' data is missing.");
           return;
         }
         
-        if (window.confirm("Importing this backup will overwrite your current family tree. Continue?")) {
-          takeSnapshot();
-          if (data.name) {
-            setTreeName(data.name);
-            localStorage.setItem('family-tree-name', data.name);
-          }
-          const { nodes: migratedNodes, edges: migratedEdges } = migrateLegacyIds(data.nodes, data.edges);
-          setNodes(migratedNodes);
-          setEdges(migratedEdges);
-          localStorage.setItem('family-tree-nodes', JSON.stringify(migratedNodes));
-          localStorage.setItem('family-tree-edges', JSON.stringify(migratedEdges));
-          
-          setTimeout(() => cleanupTree(true), 150);
+        triggerConfirm(
+          "Import Backup",
+          "Importing this backup will overwrite your current active family tree. Do you want to continue?",
+          () => {
+            takeSnapshot();
+            if (data.name) {
+              setTreeName(data.name);
+              localStorage.setItem('family-tree-name', data.name);
+            }
+            const { nodes: migratedNodes, edges: migratedEdges } = migrateLegacyIds(data.nodes, data.edges);
+            setNodes(migratedNodes);
+            setEdges(migratedEdges);
+            localStorage.setItem('family-tree-nodes', JSON.stringify(migratedNodes));
+            localStorage.setItem('family-tree-edges', JSON.stringify(migratedEdges));
+            
+            setTimeout(() => cleanupTree(true), 150);
 
-          // Show toast
-          setShowSaveToast(true);
-          setTimeout(() => setShowSaveToast(false), 2000);
-        }
+            // Show toast
+            setSaveToastMsg('Backup imported successfully');
+            setShowSaveToast(true);
+            setTimeout(() => setShowSaveToast(false), 2000);
+          }
+        );
       } catch (err) {
-        alert("Failed to parse JSON backup file: " + err.message);
+        triggerAlert("Parse Error", "Failed to parse JSON backup file: " + err.message);
       }
     };
     reader.readAsText(file);
@@ -1650,6 +1725,16 @@ function FlowApp() {
           onClose={() => setRelationFinderState({ isOpen: false, fromMemberId: null })}
         />
       )}
+
+      {/* Custom Dialog / Confirmation Modals */}
+      <CustomDialog
+        isOpen={customDialog.isOpen}
+        title={customDialog.title}
+        message={customDialog.message}
+        type={customDialog.type}
+        onConfirm={customDialog.onConfirm}
+        onCancel={customDialog.onCancel}
+      />
 
       {/* Save Toast */}
       <AnimatePresence>

@@ -93,9 +93,7 @@ export default function BranchSwitcher({
                     title="Delete tree"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm(`Delete "${branch.name}"? This cannot be undone.`)) {
-                        onDelete(branch.id);
-                      }
+                      onDelete(branch.id, branch.name);
                     }}
                   >
                     <Trash2 size={12} />

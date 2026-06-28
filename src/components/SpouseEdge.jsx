@@ -74,9 +74,7 @@ export default function SpouseEdge({
                 className="edge-menu-btn unlink"
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (window.confirm('Remove this marriage link?')) {
-                    window.dispatchEvent(new CustomEvent('edge-unlink', { detail: { id } }));
-                  }
+                  window.dispatchEvent(new CustomEvent('edge-unlink', { detail: { id, type: 'spouse' } }));
                 }}
               >
                 <X size={14} />

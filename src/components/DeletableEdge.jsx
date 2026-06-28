@@ -84,9 +84,7 @@ export default function DeletableEdge({
                 className="edge-menu-btn unlink"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (window.confirm('Are you sure you want to unlink these two people?')) {
-                    window.dispatchEvent(new CustomEvent('edge-unlink', { detail: { id } }));
-                  }
+                  window.dispatchEvent(new CustomEvent('edge-unlink', { detail: { id, type: 'deletable' } }));
                 }}
                 title="Unlink"
               >
