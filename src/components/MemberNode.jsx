@@ -36,7 +36,7 @@ const MemberNode = ({ data, id }) => {
         {imageUrl ? (
           <img src={imageUrl} alt={name} />
         ) : (
-          <User size={36} color={accentColor} />
+          <User size={44} color={accentColor} />
         )}
       </motion.div>
 

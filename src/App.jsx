@@ -998,6 +998,14 @@ function FlowApp() {
     setRelationFinderState({ isOpen: true, fromMemberId: memberId });
   }, []);
 
+  const handleSelectMemberFromProfile = useCallback((memberId) => {
+    setProfileState({ isOpen: true, memberId });
+    const node = nodes.find(n => n.id === memberId);
+    if (node) {
+      setCenter(node.position.x + 80, node.position.y + 90, { zoom: 1.2, duration: 600 });
+    }
+  }, [nodes, setCenter]);
+
   const handleDelete = useCallback((memberId) => {
     if (window.confirm('Are you sure you want to remove this person?')) {
       takeSnapshot();
@@ -1468,9 +1476,12 @@ function FlowApp() {
       <MemberProfile
         isOpen={profileState.isOpen}
         member={profileState.memberId ? nodes.find(n => n.id === profileState.memberId) : null}
+        nodes={nodes}
+        edges={edges}
         onClose={() => setProfileState({ isOpen: false, memberId: null })}
         onEdit={handleOpenEditFromProfile}
         onFindRelation={handleOpenRelationFinder}
+        onSelectMember={handleSelectMemberFromProfile}
       />
 
       {/* Relationship Finder */}

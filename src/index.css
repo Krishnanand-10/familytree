@@ -518,8 +518,8 @@ body {
 
 /* ── Photo circle ─────────────────────────────────────────────────────────── */
 .portrait-photo {
-  width: 65px;
-  height: 65px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   border: 3px solid #2196f3; /* overridden inline per gender */
   background: #f5f5f5;
@@ -1618,11 +1618,109 @@ body {
 }
 
 /* Details */
-.profile-details {
+.profile-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.profile-details-section {
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.profile-relatives-section {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.profile-sec-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+.profile-sec-title svg {
+  color: #ff6b35;
+}
+
+.profile-rel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-rel-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.profile-rel-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.22);
+  font-style: italic;
+  padding-left: 4px;
+}
+
+.profile-rel-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  color: #fff;
+  font-family: inherit;
+}
+
+.profile-rel-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(2px);
+}
+
+.profile-rel-gender-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.profile-rel-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-rel-chevron {
+  color: rgba(255, 255, 255, 0.25);
   flex-shrink: 0;
 }
 
@@ -1652,15 +1750,6 @@ body {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
-}
-
-.profile-empty-hint {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.25);
-  font-style: italic;
-  text-align: center;
-  padding: 8px 0;
-  margin: 0;
 }
 
 /* Notes */
