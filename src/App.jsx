@@ -153,12 +153,21 @@ function layoutTree(nodes, edges) {
   const memberNodes = newNodes.filter(n => n.type === 'member');
   const roots = memberNodes.filter(n => !isAlsoChild(n.id));
 
+  // Identify if there is an interactive tree (at least one root has a spouse or children)
+  const hasInteractiveTree = roots.some(r => getAllChildren(r.id).length > 0 || getSpouseId(r.id) !== null);
+
+  // Filter out standalone disconnected nodes so they are placed below the tree
+  const interactiveRoots = roots.filter(r => {
+    if (!hasInteractiveTree) return true;
+    return getAllChildren(r.id).length > 0 || getSpouseId(r.id) !== null;
+  });
+
   // If there's a married couple at the root, treat them together
   // Build "family units" at root level: a root + its spouse (if spouse is also a root)
-  const rootIds = new Set(roots.map(n => n.id));
+  const rootIds = new Set(interactiveRoots.map(n => n.id));
   const processedRoots = new Set();
   const rootUnits = []; // each unit is [memberId] or [memberId, spouseId]
-  roots.forEach(r => {
+  interactiveRoots.forEach(r => {
     if (processedRoots.has(r.id)) return;
     processedRoots.add(r.id);
     const sp = getSpouseId(r.id);
@@ -201,7 +210,7 @@ function layoutTree(nodes, edges) {
     return myWidth;
   };
 
-  roots.forEach(r => calcWidth(r.id));
+  interactiveRoots.forEach(r => calcWidth(r.id));
 
   // --- Top-down placement ---
   const positioned = new Set();
@@ -302,13 +311,28 @@ function layoutTree(nodes, edges) {
 
   // --- Place any unpositioned members (disconnected nodes) below the lowest positioned node ---
   let maxY = 0;
+  let minX = 0;
+  let maxX = 0;
+  let hasPositioned = false;
+
   newNodes.forEach(node => {
-    if (positioned.has(node.id) && node.position.y > maxY) {
-      maxY = node.position.y;
+    if (positioned.has(node.id)) {
+      if (!hasPositioned) {
+        minX = node.position.x;
+        maxX = node.position.x;
+        maxY = node.position.y;
+        hasPositioned = true;
+      } else {
+        if (node.position.x < minX) minX = node.position.x;
+        if (node.position.x > maxX) maxX = node.position.x;
+        if (node.position.y > maxY) maxY = node.position.y;
+      }
     }
   });
 
-  let floatX = 0;
+  const treeCenterX = hasPositioned ? (minX + maxX) / 2 : 0;
+  let floatX = treeCenterX - CARD_W / 2;
+
   newNodes.forEach((node, i) => {
      if (node.type === 'member' && !positioned.has(node.id)) {
        newNodes[i] = { ...node, position: { x: floatX, y: maxY + (maxY > 0 ? V_GAP : 0) } };
@@ -341,7 +365,7 @@ function layoutTree(nodes, edges) {
 
 // Inner component that can use useReactFlow()
 function FlowApp() {
-  const { screenToFlowPosition, fitView, setCenter, getViewport } = useReactFlow();
+  const { screenToFlowPosition, fitView, setCenter, getZoom } = useReactFlow();
 
   // ── Branch Management ──────────────────────────────────────────────────────
   const DEFAULT_BRANCH_ID = 'default';
@@ -876,23 +900,12 @@ function FlowApp() {
           const targetNode = newNodes.find(n => n.id === focusNodeId);
           if (targetNode) {
             setTimeout(() => {
-              const { x: vpX, y: vpY, zoom } = getViewport();
-              const minX = -vpX / zoom;
-              const maxX = (-vpX + window.innerWidth) / zoom;
-              const minY = -vpY / zoom;
-              const maxY = (-vpY + window.innerHeight) / zoom;
-
-              // Check if the newly added node is off-screen
-              const isVisible = 
-                targetNode.position.x >= minX &&
-                targetNode.position.x + 160 <= maxX &&
-                targetNode.position.y >= minY &&
-                targetNode.position.y + 80 <= maxY;
-
-              if (!isVisible) {
-                // If it is off-screen, smoothly fit view to bring it into view
-                fitView({ duration: 600, padding: 0.25 });
-              }
+              const currentZoom = getZoom();
+              // Pan just enough so the new card sits near the bottom of the screen
+              setCenter(targetNode.position.x + 80, targetNode.position.y + 40 - 150, {
+                zoom: currentZoom,
+                duration: 800
+              });
             }, 150);
           }
         } else {
@@ -900,7 +913,7 @@ function FlowApp() {
         }
       }
     }
-  }, [setNodes, setEdges, takeSnapshot, fitView, getViewport]);
+  }, [setNodes, setEdges, takeSnapshot, fitView, getZoom, setCenter]);
 
   // Helper to fetch family tree from database or local storage
   const fetchTreeForBranch = useCallback(async (branchId) => {
