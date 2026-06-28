@@ -121,23 +121,23 @@ function interpretPath(path, nodes) {
     if (s === 'parent,parent,child') return g('Uncle', 'Aunt', 'Uncle/Aunt');
     if (s === 'parent,child,child') return g('Nephew', 'Niece', 'Nephew/Niece');
     
-    if (s === 'parent,parent,child,child') return '1st Cousin';
+    if (s === 'parent,parent,child,child') return 'Cousin';
     if (s === 'parent,parent,parent,child') return g('Great-Uncle', 'Great-Aunt', 'Great-Uncle/Aunt');
     if (s === 'parent,child,child,child') return g('Great-Nephew', 'Great-Niece', 'Great-Nephew/Niece');
     
     if (s === 'parent,parent,parent,parent') return g('Great-Great-Grandfather', 'Great-Great-Grandmother', 'Great-Great-Grandparent');
     if (s === 'child,child,child,child')     return g('Great-Great-Grandson', 'Great-Great-Granddaughter', 'Great-Great-Grandchild');
     
-    if (s === 'parent,parent,parent,child,child') return '1st Cousin Once Removed';
-    if (s === 'parent,parent,child,child,child') return '1st Cousin Once Removed';
+    if (s === 'parent,parent,parent,child,child') return 'Cousin';
+    if (s === 'parent,parent,child,child,child') return 'Cousin';
     
-    if (s === 'parent,parent,parent,child,child,child') return '2nd Cousin';
-    if (s === 'parent,parent,parent,parent,child,child') return '1st Cousin Twice Removed';
-    if (s === 'parent,parent,child,child,child,child')   return '1st Cousin Twice Removed';
+    if (s === 'parent,parent,parent,child,child,child') return 'Cousin';
+    if (s === 'parent,parent,parent,parent,child,child') return 'Cousin';
+    if (s === 'parent,parent,child,child,child,child')   return 'Cousin';
     
-    if (s === 'parent,parent,parent,parent,child,child,child') return '2nd Cousin Once Removed';
-    if (s === 'parent,parent,parent,child,child,child,child')  return '2nd Cousin Once Removed';
-    if (s === 'parent,parent,parent,parent,child,child,child,child') return '3rd Cousin';
+    if (s === 'parent,parent,parent,parent,child,child,child') return 'Cousin';
+    if (s === 'parent,parent,parent,child,child,child,child')  return 'Cousin';
+    if (s === 'parent,parent,parent,parent,child,child,child,child') return 'Cousin';
     
     // Fallback counts
     const ups = subVias.filter(v => v === 'parent').length;
@@ -150,10 +150,9 @@ function interpretPath(path, nodes) {
       const prefix = 'Great-'.repeat(downs - 2);
       return `${prefix}Great-${g('Grandson', 'Granddaughter', 'Grandchild')}`;
     }
-    if (ups === downs) {
-      return `${ups - 1}th Cousin`;
+    if (ups > 0 && downs > 0) {
+      return 'Cousin';
     }
-    return `${Math.min(ups, downs) - 1}th Cousin ${Math.abs(ups - downs)}x Removed`;
   };
 
   const destId = path[path.length - 1].id;
