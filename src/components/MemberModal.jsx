@@ -12,7 +12,9 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
         gender: member.data.gender || 'male',
         imageUrl: member.data.imageUrl || '',
         isAlive: member.data.isAlive !== undefined ? member.data.isAlive : !member.data.deathYear,
-        notes: member.data.notes || ''
+        notes: member.data.notes || '',
+        birthPlace: member.data.birthPlace || '',
+        nationality: member.data.nationality || '',
       };
     }
     return {
@@ -22,7 +24,9 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
       gender: 'male',
       imageUrl: '',
       isAlive: true,
-      notes: ''
+      notes: '',
+      birthPlace: '',
+      nationality: '',
     };
   });
 
@@ -132,6 +136,27 @@ const MemberModal = ({ isOpen, onClose, onSave, onDelete, member, mode }) => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Birthplace</label>
+              <input
+                type="text"
+                value={formData.birthPlace}
+                onChange={(e) => setFormData({ ...formData, birthPlace: e.target.value })}
+                placeholder="e.g. Mumbai, India"
+              />
+            </div>
+            <div className="form-group">
+              <label>Nationality / Ethnicity</label>
+              <input
+                type="text"
+                value={formData.nationality}
+                onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+                placeholder="e.g. Indian"
+              />
             </div>
           </div>
 

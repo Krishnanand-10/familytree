@@ -14,6 +14,8 @@ import '@xyflow/react/dist/style.css';
 
 import MemberNode from './components/MemberNode';
 import MemberModal from './components/MemberModal';
+import MemberProfile from './components/MemberProfile';
+import RelationFinder from './components/RelationFinder';
 import DeletableEdge from './components/DeletableEdge';
 import FamilyEdge from './components/FamilyEdge';
 import MarriageEdge from './components/MarriageEdge';
@@ -535,6 +537,18 @@ function FlowApp() {
     relativeType: null,
   });
 
+  // Profile Panel State
+  const [profileState, setProfileState] = useState({
+    isOpen: false,
+    memberId: null,
+  });
+
+  // Relation Finder State
+  const [relationFinderState, setRelationFinderState] = useState({
+    isOpen: false,
+    fromMemberId: null,
+  });
+
   // Handle unlinking via custom event from DeletableEdge
   useEffect(() => {
     const handleUnlink = (event) => {
@@ -965,12 +979,23 @@ function FlowApp() {
   }, []);
 
   const handleEdit = useCallback((memberId) => {
+    // Open the read-only profile panel first
+    setProfileState({ isOpen: true, memberId });
+  }, []);
+
+  const handleOpenEditFromProfile = useCallback((memberId) => {
+    setProfileState({ isOpen: false, memberId: null });
     setModalState({
       isOpen: true,
       mode: 'edit',
       activeMemberId: memberId,
       relativeType: null,
     });
+  }, []);
+
+  const handleOpenRelationFinder = useCallback((memberId) => {
+    setProfileState({ isOpen: false, memberId: null });
+    setRelationFinderState({ isOpen: true, fromMemberId: memberId });
   }, []);
 
   const handleDelete = useCallback((memberId) => {
@@ -1438,6 +1463,24 @@ function FlowApp() {
           onSave={handleSaveMember}
           onDelete={handleDelete}
         />
+
+      {/* Member Profile Panel */}
+      <MemberProfile
+        isOpen={profileState.isOpen}
+        member={profileState.memberId ? nodes.find(n => n.id === profileState.memberId) : null}
+        onClose={() => setProfileState({ isOpen: false, memberId: null })}
+        onEdit={handleOpenEditFromProfile}
+        onFindRelation={handleOpenRelationFinder}
+      />
+
+      {/* Relationship Finder */}
+      <RelationFinder
+        isOpen={relationFinderState.isOpen}
+        fromMemberId={relationFinderState.fromMemberId}
+        nodes={nodes}
+        edges={edges}
+        onClose={() => setRelationFinderState({ isOpen: false, fromMemberId: null })}
+      />
 
       {/* Save Toast */}
       <AnimatePresence>
