@@ -202,7 +202,7 @@ export default function MemberProfile({ isOpen, member, nodes, edges, onClose, o
               <div className="profile-relatives-section">
                 <h3 className="profile-sec-title">
                   <Users size={13} />
-                  <span>Immediate Relatives</span>
+                  <span>Family Connections</span>
                 </h3>
 
                 {/* Parents */}
