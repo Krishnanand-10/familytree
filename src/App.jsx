@@ -22,10 +22,12 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BranchSwitcher from './components/BranchSwitcher';
 import CustomDialog from './components/CustomDialog';
+import { supabase } from './supabaseClient';
+import AuthScreen from './components/AuthScreen';
 
 const nodeTypes = {
   member: MemberNode,
@@ -364,9 +366,22 @@ function layoutTree(nodes, edges) {
   return { nodes: newNodes, edges: newEdges };
 }
 
-// Inner component that can use useReactFlow()
-function FlowApp() {
+function FlowApp({ session }) {
   const { screenToFlowPosition, fitView, setCenter, getZoom } = useReactFlow();
+
+  const apiFetch = useCallback(async (url, options = {}) => {
+    const token = session?.access_token;
+    const headers = {
+      ...options.headers,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  }, [session]);
 
   // ── Branch Management ──────────────────────────────────────────────────────
   const DEFAULT_BRANCH_ID = 'default';
@@ -436,7 +451,7 @@ function FlowApp() {
     localStorage.setItem('family-tree-edges', JSON.stringify(edges));
 
     try {
-      const res = await fetch(`http://localhost:5000/api/tree?branchId=${activeBranchId}`, {
+      const res = await apiFetch(`http://localhost:5000/api/tree?branchId=${activeBranchId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodes, edges })
@@ -458,7 +473,7 @@ function FlowApp() {
       setIsSaving(false);
       setTimeout(() => setShowSaveToast(false), 3000);
     }
-  }, [nodes, edges, treeName, activeBranchId, branches, nodesKey, edgesKey]);
+  }, [nodes, edges, treeName, activeBranchId, branches, nodesKey, edgesKey, apiFetch]);
 
   // Track latest nodes/edges for cleanup logic to avoid stale closures
   const nodesRef = useRef(nodes);
@@ -504,7 +519,7 @@ function FlowApp() {
     // Persist branch rename to backend if database is online
     if (dbStatus === 'connected') {
       try {
-        await fetch('http://localhost:5000/api/branches', {
+        await apiFetch('http://localhost:5000/api/branches', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: activeBranchId, name: newName })
@@ -513,7 +528,7 @@ function FlowApp() {
         console.warn('Kinship: Could not sync branch rename to database.', err);
       }
     }
-  }, [activeBranchId, branches, dbStatus]);
+  }, [activeBranchId, branches, dbStatus, apiFetch]);
 
   // Save to localStorage (branch-specific) when tree changes
   useEffect(() => {
@@ -974,11 +989,13 @@ function FlowApp() {
   // Helper to fetch family tree from database or local storage
   const fetchTreeForBranch = useCallback(async (branchId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/tree?branchId=${branchId}`);
+      const res = await apiFetch(`http://localhost:5000/api/tree?branchId=${branchId}`);
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json();
       
-      if (data.nodes && data.edges) {
+      // Only return DB tree if it has actual member data.
+      // If DB is empty, let it fall through to load local storage nodes.
+      if (data.nodes && data.nodes.length > 0) {
         return { nodes: data.nodes, edges: data.edges, status: 'connected' };
       }
     } catch (err) {
@@ -994,7 +1011,7 @@ function FlowApp() {
     const parsedEdges = savedEdges ? JSON.parse(savedEdges) : (branchId === DEFAULT_BRANCH_ID ? initialEdges : []);
     const { nodes: mN, edges: mE } = migrateLegacyIds(parsedNodes, parsedEdges);
     return { nodes: mN, edges: mE, status: 'fallback' };
-  }, []);
+  }, [apiFetch]);
 
   // Load a branch's tree with local storage fallback (used on startup mount)
   const loadTreeForBranch = useCallback(async (branchId) => {
@@ -1042,7 +1059,7 @@ function FlowApp() {
     // Save to backend database
     if (dbStatus === 'connected') {
       try {
-        await fetch('http://localhost:5000/api/branches', {
+        await apiFetch('http://localhost:5000/api/branches', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newBranch)
@@ -1058,7 +1075,7 @@ function FlowApp() {
     setActiveBranchId(newId);
     localStorage.setItem('family-tree-active-branch', newId);
     setTreeName(name);
-  }, [branches, nodesKey, edgesKey, nodes, edges, setNodes, setEdges, dbStatus]);
+  }, [branches, nodesKey, edgesKey, nodes, edges, setNodes, setEdges, dbStatus, apiFetch]);
 
   const deleteBranch = useCallback(async (branchId, branchName) => {
     triggerConfirm(
@@ -1074,7 +1091,7 @@ function FlowApp() {
         // Delete from backend database
         if (dbStatus === 'connected') {
           try {
-            await fetch(`http://localhost:5000/api/branches/${branchId}`, {
+            await apiFetch(`http://localhost:5000/api/branches/${branchId}`, {
               method: 'DELETE'
             });
           } catch (err) {
@@ -1088,7 +1105,7 @@ function FlowApp() {
         }
       }
     );
-  }, [branches, activeBranchId, switchBranch, dbStatus, triggerConfirm]);
+  }, [branches, activeBranchId, switchBranch, dbStatus, triggerConfirm, apiFetch]);
 
   // Load branches list and then active tree branch on mount
   useEffect(() => {
@@ -1096,7 +1113,7 @@ function FlowApp() {
       let isDbConnected = false;
       let dbBranches = [];
       try {
-        const res = await fetch('http://localhost:5000/api/branches');
+        const res = await apiFetch('http://localhost:5000/api/branches');
         if (res.ok) {
           dbBranches = await res.json();
           if (dbBranches && dbBranches.length > 0) {
@@ -1109,27 +1126,71 @@ function FlowApp() {
         console.warn('Kinship: Could not fetch branches from database.', err);
       }
 
-      const activeId = localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID;
+      let activeId = localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID;
       
       if (isDbConnected) {
         setDbStatus('connected');
-        // Check if our active branch is in the database branches list. If not, add/upsert it
-        const currentActiveBranch = dbBranches.find(b => b.id === activeId || (activeId === 'default' && b.id === '00000000-0000-0000-0000-000000000000'));
-        if (!currentActiveBranch) {
+        
+        let currentActiveBranch = dbBranches.find(b => b.id === activeId);
+        
+        // If logged in, but activeId is default or not in database, map to first active branch
+        if (!currentActiveBranch && activeId === 'default' && dbBranches.length > 0) {
+          currentActiveBranch = dbBranches[0];
+        }
+
+        if (currentActiveBranch) {
+          activeId = currentActiveBranch.id;
+          setActiveBranchId(activeId);
+          localStorage.setItem('family-tree-active-branch', activeId);
+          setTreeName(currentActiveBranch.name);
+
+          // Copy local storage nodes from default to this branch if this branch doesn't have entries yet
+          const newNodesKey = `family-tree-nodes-${activeId}`;
+          const newEdgesKey = `family-tree-edges-${activeId}`;
+          if (!localStorage.getItem(newNodesKey)) {
+            const defaultNodes = localStorage.getItem('family-tree-nodes-default') || localStorage.getItem('family-tree-nodes');
+            const defaultEdges = localStorage.getItem('family-tree-edges-default') || localStorage.getItem('family-tree-edges');
+            if (defaultNodes) localStorage.setItem(newNodesKey, defaultNodes);
+            if (defaultEdges) localStorage.setItem(newEdgesKey, defaultEdges);
+          }
+        } else {
           // Sync current branch metadata to backend
           const localBranch = JSON.parse(localStorage.getItem('family-tree-branches') || '[]').find(b => b.id === activeId) || { id: activeId, name: treeName };
           try {
-            await fetch('http://localhost:5000/api/branches', {
+            const syncRes = await apiFetch('http://localhost:5000/api/branches', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(localBranch)
             });
-            // Reload branches
-            const reloadRes = await fetch('http://localhost:5000/api/branches');
-            if (reloadRes.ok) {
-              const latestBranches = await reloadRes.json();
-              setBranches(latestBranches);
-              localStorage.setItem('family-tree-branches', JSON.stringify(latestBranches));
+            if (syncRes.ok) {
+              const syncData = await syncRes.json();
+              const newBranchId = syncData.data?.id;
+
+              // Reload branches
+              const reloadRes = await apiFetch('http://localhost:5000/api/branches');
+              if (reloadRes.ok) {
+                const latestBranches = await reloadRes.json();
+                setBranches(latestBranches);
+                localStorage.setItem('family-tree-branches', JSON.stringify(latestBranches));
+
+                if (newBranchId) {
+                  activeId = newBranchId;
+                  setActiveBranchId(activeId);
+                  localStorage.setItem('family-tree-active-branch', activeId);
+                  const updatedBranch = latestBranches.find(b => b.id === activeId);
+                  if (updatedBranch) setTreeName(updatedBranch.name);
+
+                  // Copy local storage nodes
+                  const newNodesKey = `family-tree-nodes-${activeId}`;
+                  const newEdgesKey = `family-tree-edges-${activeId}`;
+                  if (!localStorage.getItem(newNodesKey)) {
+                    const defaultNodes = localStorage.getItem('family-tree-nodes-default') || localStorage.getItem('family-tree-nodes');
+                    const defaultEdges = localStorage.getItem('family-tree-edges-default') || localStorage.getItem('family-tree-edges');
+                    if (defaultNodes) localStorage.setItem(newNodesKey, defaultNodes);
+                    if (defaultEdges) localStorage.setItem(newEdgesKey, defaultEdges);
+                  }
+                }
+              }
             }
           } catch (e) {
             console.error('Failed to sync new active branch to database', e);
@@ -1153,7 +1214,7 @@ function FlowApp() {
 
     initializeApp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTreeForBranch]);
+  }, [loadTreeForBranch, apiFetch]);
 
   const rearrangeEverything = useCallback(() => {
     takeSnapshot();
@@ -1657,6 +1718,17 @@ function FlowApp() {
             <Save size={15} />
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
+
+          <div className="k-divider-v" />
+
+          <div className="user-profile-wrap">
+            <span className="user-email" title={session?.user?.email}>
+              {session?.user?.email ? session.user.email.split('@')[0] : 'User'}
+            </span>
+            <button className="k-logout-btn" onClick={() => supabase.auth.signOut()} title="Log Out">
+              <LogOut size={15} />
+            </button>
+          </div>
         </div>
 
       </header>
@@ -1756,9 +1828,38 @@ function FlowApp() {
 }
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="auth-container">
+        <div className="auth-logo-icon animate-spin" style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)', borderRadius: '10px' }} />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen />;
+  }
+
   return (
     <ReactFlowProvider>
-      <FlowApp />
+      <FlowApp session={session} />
     </ReactFlowProvider>
   );
 }

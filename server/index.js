@@ -18,13 +18,52 @@ const DEFAULT_BRANCH_ID = '00000000-0000-0000-0000-000000000000'; // Seed branch
 let supabase = null;
 if (supabaseUrl && supabaseKey && supabaseUrl !== 'https://your-supabase-project.supabase.co') {
   supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('Supabase client initialized successfully.');
+  console.log('Global Supabase client initialized.');
 } else {
   console.warn('\n⚠️  WARNING: Supabase credentials are not configured in the server/.env file.');
   console.warn('The server will start but endpoints requesting database sync will fail or run in mockup mode.\n');
 }
 
-// Health Check
+// Middleware to verify JWT and attach user-scoped supabase client
+const requireAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization header missing or invalid.' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(503).json({ error: 'Database credentials not configured on the server.' });
+    }
+
+    // Instantiate a user-specific Supabase client using their JWT
+    const userClient = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+
+    const { data: { user }, error } = await userClient.auth.getUser();
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+
+    req.user = user;
+    req.supabase = userClient;
+    next();
+  } catch (error) {
+    console.error('Auth verification error:', error);
+    res.status(401).json({ error: 'Authentication failed.' });
+  }
+};
+
+// Health Check (Public)
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -32,20 +71,33 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// GET: Fetch all family branches
-app.get('/api/branches', async (req, res) => {
-  if (!supabase) {
-    return res.status(503).json({
-      error: 'Database not configured.',
-    });
-  }
+// GET: Fetch all family branches (Protected)
+app.get('/api/branches', requireAuth, async (req, res) => {
   try {
-    const { data: branches, error } = await supabase
+    const { data: branches, error } = await req.supabase
       .from('family_branches')
       .select('*')
       .order('created_at', { ascending: true });
 
     if (error) throw error;
+
+    // Automatically provision a default branch for this new user if they have none
+    if (!branches || branches.length === 0) {
+      const emailName = req.user.email ? req.user.email.split('@')[0] : 'My';
+      const displayName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      
+      const { data: newBranch, error: createError } = await req.supabase
+        .from('family_branches')
+        .insert({
+          name: `${displayName}'s Family Tree`,
+          user_id: req.user.id
+        })
+        .select();
+
+      if (createError) throw createError;
+      return res.json(newBranch || []);
+    }
+
     res.json(branches || []);
   } catch (error) {
     console.error('Error fetching branches:', error);
@@ -53,26 +105,25 @@ app.get('/api/branches', async (req, res) => {
   }
 });
 
-// POST: Upsert a family branch (create or rename)
-app.post('/api/branches', async (req, res) => {
+// POST: Upsert a family branch (Protected)
+app.post('/api/branches', requireAuth, async (req, res) => {
   const { id, name } = req.body;
-  if (!supabase) {
-    return res.status(503).json({
-      error: 'Database not configured.',
-    });
-  }
 
   let dbId = id;
-  if (dbId === 'default') {
-    dbId = DEFAULT_BRANCH_ID;
+  if (dbId === 'default' || dbId === DEFAULT_BRANCH_ID) {
+    // If saving the initial seed or default branch, make sure it gets a new random UUID
+    // rather than editing the global default branch which other users might share.
+    // However, if the client sends a specific UUID, we upsert on that.
+    dbId = undefined; // Supabase will auto-generate a UUID
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('family_branches')
       .upsert({
-        id: dbId,
+        ...(dbId ? { id: dbId } : {}),
         name: name || 'Unnamed Tree',
+        user_id: req.user.id,
       })
       .select();
 
@@ -84,21 +135,15 @@ app.post('/api/branches', async (req, res) => {
   }
 });
 
-// DELETE: Delete a family branch (cascades to people and relationships)
-app.delete('/api/branches/:id', async (req, res) => {
+// DELETE: Delete a family branch (Protected)
+app.delete('/api/branches/:id', requireAuth, async (req, res) => {
   let branchId = req.params.id;
-  if (!supabase) {
-    return res.status(503).json({
-      error: 'Database not configured.',
-    });
-  }
-
   if (branchId === 'default') {
     branchId = DEFAULT_BRANCH_ID;
   }
 
   try {
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('family_branches')
       .delete()
       .eq('id', branchId);
@@ -111,22 +156,16 @@ app.delete('/api/branches/:id', async (req, res) => {
   }
 });
 
-// GET: Load family tree nodes and edges from Supabase
-app.get('/api/tree', async (req, res) => {
+// GET: Load family tree nodes and edges from Supabase (Protected)
+app.get('/api/tree', requireAuth, async (req, res) => {
   let branchId = req.query.branchId || DEFAULT_BRANCH_ID;
   if (branchId === 'default') {
     branchId = DEFAULT_BRANCH_ID;
   }
 
-  if (!supabase) {
-    return res.status(503).json({
-      error: 'Database not configured. Configure SUPABASE_URL and SUPABASE_KEY in the server/.env file.',
-    });
-  }
-
   try {
     // 1. Fetch people in this branch
-    const { data: people, error: peopleError } = await supabase
+    const { data: people, error: peopleError } = await req.supabase
       .from('people')
       .select('*')
       .eq('branch_id', branchId);
@@ -139,7 +178,7 @@ app.get('/api/tree', async (req, res) => {
 
     // 2. Fetch relationships for these people
     const personIds = people.map(p => p.id);
-    const { data: relationships, error: relError } = await supabase
+    const { data: relationships, error: relError } = await req.supabase
       .from('relationships')
       .select('*')
       .in('person_a', personIds);
@@ -195,18 +234,12 @@ app.get('/api/tree', async (req, res) => {
   }
 });
 
-// POST: Save/Sync the client React Flow tree state back to Supabase
-app.post('/api/tree', async (req, res) => {
+// POST: Save/Sync the client React Flow tree state back to Supabase (Protected)
+app.post('/api/tree', requireAuth, async (req, res) => {
   const { nodes, edges } = req.body;
   let branchId = req.query.branchId || DEFAULT_BRANCH_ID;
   if (branchId === 'default') {
     branchId = DEFAULT_BRANCH_ID;
-  }
-
-  if (!supabase) {
-    return res.status(503).json({
-      error: 'Database not configured. Configure SUPABASE_URL and SUPABASE_KEY in the server/.env file.',
-    });
   }
 
   try {
@@ -232,7 +265,7 @@ app.post('/api/tree', async (req, res) => {
 
     // 2. Perform People Upsert
     if (peopleData.length > 0) {
-      const { error: upsertErr } = await supabase
+      const { error: upsertErr } = await req.supabase
         .from('people')
         .upsert(peopleData);
       
@@ -242,7 +275,7 @@ app.post('/api/tree', async (req, res) => {
     // 3. Delete any members that were deleted in the UI (not present in current nodes)
     const currentIds = peopleData.map(p => p.id);
     if (currentIds.length > 0) {
-      const { error: deletePeopleErr } = await supabase
+      const { error: deletePeopleErr } = await req.supabase
         .from('people')
         .delete()
         .eq('branch_id', branchId)
@@ -251,7 +284,7 @@ app.post('/api/tree', async (req, res) => {
       if (deletePeopleErr) throw deletePeopleErr;
     } else {
       // If tree is cleared completely, delete all people
-      const { error: clearPeopleErr } = await supabase
+      const { error: clearPeopleErr } = await req.supabase
         .from('people')
         .delete()
         .eq('branch_id', branchId);
@@ -272,12 +305,10 @@ app.post('/api/tree', async (req, res) => {
         // If source is a junction (format: j-parentAId-parentBId)
         if (edge.source.startsWith('j-')) {
           let parentA, parentB;
-          // UUID length is 36 chars. j-UUID-UUID is 2 + 36 + 1 + 36 = 75 chars.
           if (edge.source.length === 75) {
             parentA = edge.source.slice(2, 38);
             parentB = edge.source.slice(39);
           } else {
-            // Fallback for legacy short/timestamp-based IDs
             const parts = edge.source.split('-');
             parentA = parts[1];
             parentB = parts[2];
@@ -299,7 +330,7 @@ app.post('/api/tree', async (req, res) => {
       }
     });
 
-    // Deduplicate relationships (e.g. from overlapping parent junctions or duplicates)
+    // Deduplicate relationships
     const relationshipsData = [];
     const seen = new Set();
     relationshipsRaw.forEach(rel => {
@@ -311,8 +342,7 @@ app.post('/api/tree', async (req, res) => {
     });
 
     // 5. Delete existing relationships for this branch to prevent duplicates
-    // Fetch all current people IDs in the DB to clear relationships cleanly
-    const { data: dbPeople, error: dbPeopleErr } = await supabase
+    const { data: dbPeople, error: dbPeopleErr } = await req.supabase
       .from('people')
       .select('id')
       .eq('branch_id', branchId);
@@ -321,7 +351,7 @@ app.post('/api/tree', async (req, res) => {
 
     if (dbPeople && dbPeople.length > 0) {
       const dbPeopleIds = dbPeople.map(p => p.id);
-      const { error: deleteRelErr } = await supabase
+      const { error: deleteRelErr } = await req.supabase
         .from('relationships')
         .delete()
         .or(`person_a.in.(${dbPeopleIds.join(',')}),person_b.in.(${dbPeopleIds.join(',')})`);
@@ -331,7 +361,7 @@ app.post('/api/tree', async (req, res) => {
 
     // 6. Insert new relationships
     if (relationshipsData.length > 0) {
-      const { error: insertRelErr } = await supabase
+      const { error: insertRelErr } = await req.supabase
         .from('relationships')
         .insert(relationshipsData);
 
