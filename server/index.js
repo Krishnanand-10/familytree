@@ -95,10 +95,29 @@ app.get('/api/branches', requireAuth, async (req, res) => {
         .select();
 
       if (createError) throw createError;
-      return res.json(newBranch || []);
+      const provisioned = newBranch ? [{ ...newBranch[0], role: 'owner' }] : [];
+      return res.json(provisioned);
     }
 
-    res.json(branches || []);
+    // Fetch active shares for this user's email to associate roles
+    const { data: shares, error: sharesError } = await req.supabase
+      .from('branch_shares')
+      .select('*')
+      .eq('shared_with_email', req.user.email);
+
+    if (sharesError) {
+      console.warn('Could not load branch shares:', sharesError);
+    }
+
+    const branchesWithRole = (branches || []).map(b => {
+      if (b.user_id === req.user.id) {
+        return { ...b, role: 'owner' };
+      }
+      const share = (shares || []).find(s => s.branch_id === b.id);
+      return { ...b, role: share ? share.role : 'viewer' };
+    });
+
+    res.json(branchesWithRole);
   } catch (error) {
     console.error('Error fetching branches:', error);
     res.status(500).json({ error: error.message });
@@ -111,9 +130,6 @@ app.post('/api/branches', requireAuth, async (req, res) => {
 
   let dbId = id;
   if (dbId === 'default' || dbId === DEFAULT_BRANCH_ID) {
-    // If saving the initial seed or default branch, make sure it gets a new random UUID
-    // rather than editing the global default branch which other users might share.
-    // However, if the client sends a specific UUID, we upsert on that.
     dbId = undefined; // Supabase will auto-generate a UUID
   }
 
@@ -152,6 +168,69 @@ app.delete('/api/branches/:id', requireAuth, async (req, res) => {
     res.json({ success: true, message: 'Branch deleted successfully.' });
   } catch (error) {
     console.error('Error deleting branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET: Fetch all active shares for a branch (Protected)
+app.get('/api/branches/:id/shares', requireAuth, async (req, res) => {
+  const branchId = req.params.id === 'default' ? DEFAULT_BRANCH_ID : req.params.id;
+  try {
+    const { data, error } = await req.supabase
+      .from('branch_shares')
+      .select('*')
+      .eq('branch_id', branchId);
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    console.error('Error fetching shares:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST: Share a branch with another user by email (Protected)
+app.post('/api/branches/:id/shares', requireAuth, async (req, res) => {
+  const branchId = req.params.id === 'default' ? DEFAULT_BRANCH_ID : req.params.id;
+  const { email, role } = req.body;
+
+  if (!email || !role) {
+    return res.status(400).json({ error: 'Email and role are required.' });
+  }
+
+  try {
+    const { data, error } = await req.supabase
+      .from('branch_shares')
+      .upsert({
+        branch_id: branchId,
+        shared_with_email: email.trim().toLowerCase(),
+        role: role
+      }, {
+        onConflict: 'branch_id,shared_with_email'
+      })
+      .select();
+
+    if (error) throw error;
+    res.json({ success: true, data: data?.[0] });
+  } catch (error) {
+    console.error('Error creating share:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE: Revoke a share (Protected)
+app.delete('/api/branches/:id/shares/:shareId', requireAuth, async (req, res) => {
+  const shareId = req.params.shareId;
+  try {
+    const { error } = await req.supabase
+      .from('branch_shares')
+      .delete()
+      .eq('id', shareId);
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Access revoked successfully.' });
+  } catch (error) {
+    console.error('Error revoking share:', error);
     res.status(500).json({ error: error.message });
   }
 });

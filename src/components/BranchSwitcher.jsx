@@ -60,6 +60,7 @@ export default function BranchSwitcher({
           onChange={(e) => setTreeName(e.target.value)}
           placeholder="My Family Tree"
           title="Edit tree name"
+          disabled={branches.find(b => b.id === activeBranchId)?.role === 'viewer'}
         />
 
         <button
@@ -85,9 +86,14 @@ export default function BranchSwitcher({
                 >
                   <TreePine size={13} />
                   <span>{branch.name}</span>
+                  {branch.role && (
+                    <span style={{ fontSize: '9px', opacity: 0.5, marginLeft: '6px', textTransform: 'capitalize' }}>
+                      ({branch.role})
+                    </span>
+                  )}
                   {branch.id === activeBranchId && <span className="branch-active-dot" />}
                 </button>
-                {branches.length > 1 && (
+                {branch.role === 'owner' && branches.length > 1 && (
                   <button
                     className="branch-delete-btn"
                     title="Delete tree"

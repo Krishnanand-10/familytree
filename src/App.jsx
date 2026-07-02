@@ -22,12 +22,14 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, LogOut } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, LogOut, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BranchSwitcher from './components/BranchSwitcher';
 import CustomDialog from './components/CustomDialog';
 import { supabase } from './supabaseClient';
 import AuthScreen from './components/AuthScreen';
+import ShareModal from './components/ShareModal';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 const nodeTypes = {
   member: MemberNode,
@@ -406,6 +408,14 @@ function FlowApp({ session }) {
       .find(b => b.id === (localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID));
     return branch?.name || 'My Family Tree';
   });
+
+  const [activeBranchRole, setActiveBranchRole] = useState(() => {
+    const branch = JSON.parse(localStorage.getItem('family-tree-branches') || '[]')
+      .find(b => b.id === (localStorage.getItem('family-tree-active-branch') || DEFAULT_BRANCH_ID));
+    return branch?.role || 'owner';
+  });
+
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSaveToast, setShowSaveToast] = useState(false);
@@ -1039,7 +1049,10 @@ function FlowApp({ session }) {
     setDbStatus(prev => prev === 'connected' ? 'connected' : status);
 
     const branch = branches.find(b => b.id === branchId);
-    if (branch) setTreeName(branch.name);
+    if (branch) {
+      setTreeName(branch.name);
+      setActiveBranchRole(branch.role || 'viewer');
+    }
 
     setTimeout(() => fitView({ duration: 600, padding: 0.2 }), 200);
     setTimeout(() => cleanupTree(true), 250);
@@ -1133,7 +1146,6 @@ function FlowApp({ session }) {
         
         let currentActiveBranch = dbBranches.find(b => b.id === activeId);
         
-        // If logged in, but activeId is default or not in database, map to first active branch
         if (!currentActiveBranch && activeId === 'default' && dbBranches.length > 0) {
           currentActiveBranch = dbBranches[0];
         }
@@ -1143,6 +1155,7 @@ function FlowApp({ session }) {
           setActiveBranchId(activeId);
           localStorage.setItem('family-tree-active-branch', activeId);
           setTreeName(currentActiveBranch.name);
+          setActiveBranchRole(currentActiveBranch.role || 'viewer');
 
           // Copy local storage nodes from default to this branch if this branch doesn't have entries yet
           const newNodesKey = `family-tree-nodes-${activeId}`;
@@ -1178,7 +1191,10 @@ function FlowApp({ session }) {
                   setActiveBranchId(activeId);
                   localStorage.setItem('family-tree-active-branch', activeId);
                   const updatedBranch = latestBranches.find(b => b.id === activeId);
-                  if (updatedBranch) setTreeName(updatedBranch.name);
+                  if (updatedBranch) {
+                    setTreeName(updatedBranch.name);
+                    setActiveBranchRole(updatedBranch.role || 'owner');
+                  }
 
                   // Copy local storage nodes
                   const newNodesKey = `family-tree-nodes-${activeId}`;
@@ -1199,6 +1215,7 @@ function FlowApp({ session }) {
         await loadTreeForBranch(activeId);
       } else {
         setDbStatus('fallback');
+        setActiveBranchRole('owner');
         // Fallback: load tree from local storage
         const newNodesKey = `family-tree-nodes-${activeId}`;
         const newEdgesKey = `family-tree-edges-${activeId}`;
@@ -1588,11 +1605,11 @@ function FlowApp({ session }) {
       ...node,
       data: {
         ...node.data,
-        onAddRelative: handleAddRelative,
+        onAddRelative: activeBranchRole === 'viewer' ? null : handleAddRelative,
         onEdit: handleEdit,
       },
     }));
-  }, [nodes, handleAddRelative, handleEdit]);
+  }, [nodes, handleAddRelative, handleEdit, activeBranchRole]);
 
   const activeMember = modalState.activeMemberId
     ? nodes.find(n => n.id === modalState.activeMemberId)
@@ -1652,7 +1669,6 @@ function FlowApp({ session }) {
             </div>
           )}
         </div>
-
         <div className="k-header-right">
           <div className="k-btn-group">
             <button className="k-tool-btn" onClick={undo} title="Undo (Ctrl+Z)" disabled={history.length === 0}>
@@ -1665,12 +1681,12 @@ function FlowApp({ session }) {
 
           <div className="k-divider-v" />
 
-          <button className="k-tool-btn accent" onClick={rearrangeEverything} title="Magic Align">
+          <button className="k-tool-btn accent" onClick={rearrangeEverything} disabled={activeBranchRole === 'viewer'} title="Magic Align">
             <Wand2 size={15} />
             <span>Align</span>
           </button>
 
-          <button className="k-tool-btn danger" onClick={handleClearTree} title="Clear entire tree">
+          <button className="k-tool-btn danger" onClick={handleClearTree} disabled={activeBranchRole === 'viewer'} title="Clear entire tree">
             <Trash2 size={15} />
           </button>
 
@@ -1701,7 +1717,7 @@ function FlowApp({ session }) {
             )}
           </div>
 
-          <button className="k-tool-btn" onClick={handleImportClick} title="Import Backup (JSON)">
+          <button className="k-tool-btn" onClick={handleImportClick} disabled={activeBranchRole === 'viewer'} title="Import Backup (JSON)">
             <Upload size={15} />
             <input
               type="file"
@@ -1714,10 +1730,20 @@ function FlowApp({ session }) {
 
           <div className="k-divider-v" />
 
-          <button className="k-save-btn" onClick={handleSaveClick} disabled={isSaving}>
+          <button className="k-save-btn" onClick={handleSaveClick} disabled={isSaving || activeBranchRole === 'viewer'}>
             <Save size={15} />
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
+
+          {activeBranchRole === 'owner' && (
+            <>
+              <div className="k-divider-v" />
+              <button className="k-tool-btn" onClick={() => setIsShareModalOpen(true)} title="Share Tree">
+                <Share2 size={15} />
+                <span>Share</span>
+              </button>
+            </>
+          )}
 
           <div className="k-divider-v" />
 
@@ -1746,24 +1772,30 @@ function FlowApp({ session }) {
           edgeTypes={edgeTypes}
           fitView
           defaultEdgeOptions={{ type: 'deletable' }}
+          nodesDraggable={activeBranchRole !== 'viewer'}
+          nodesConnectable={activeBranchRole !== 'viewer'}
+          edgesFocusable={activeBranchRole !== 'viewer'}
+          edgesUpdatable={activeBranchRole !== 'viewer'}
         >
           <Controls />
           <MiniMap />
           <Background variant="dots" gap={12} size={1} />
         </ReactFlow>
 
-        <motion.button
-          className="k-fab"
-          onClick={() => setModalState({ isOpen: true, mode: 'add', activeMemberId: null, relativeType: null })}
-          title="Add a New Person"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.5, type: 'spring', stiffness: 260, damping: 20 }}
-          whileHover={{ scale: 1.12, boxShadow: '0 8px 28px rgba(255,107,53,0.55)' }}
-          whileTap={{ scale: 0.92 }}
-        >
-          <Plus size={22} />
-        </motion.button>
+        {activeBranchRole !== 'viewer' && (
+          <motion.button
+            className="k-fab"
+            onClick={() => setModalState({ isOpen: true, mode: 'add', activeMemberId: null, relativeType: null })}
+            title="Add a New Person"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.5, type: 'spring', stiffness: 260, damping: 20 }}
+            whileHover={{ scale: 1.12, boxShadow: '0 8px 28px rgba(255,107,53,0.55)' }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <Plus size={22} />
+          </motion.button>
+        )}
       </main>
 
       <MemberModal
@@ -1785,6 +1817,17 @@ function FlowApp({ session }) {
         onEdit={handleOpenEditFromProfile}
         onFindRelation={handleOpenRelationFinder}
         onSelectMember={handleSelectMemberFromProfile}
+        isReadOnly={activeBranchRole === 'viewer'}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        branchId={activeBranchId}
+        apiFetch={apiFetch}
+        userEmail={session?.user?.email || ''}
+        userRole={activeBranchRole}
       />
 
       {/* Relationship Finder */}
@@ -1830,16 +1873,25 @@ function FlowApp({ session }) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
+    // Check if the URL hash contains recovery token indicators
+    if (window.location.hash.includes('type=recovery') || window.location.href.includes('type=recovery')) {
+      setIsResettingPassword(true);
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setLoading(false);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResettingPassword(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -1853,8 +1905,29 @@ export default function App() {
     );
   }
 
+  if (isResettingPassword) {
+    return (
+      <ResetPasswordScreen 
+        onComplete={() => {
+          setIsResettingPassword(false);
+          // Clean up the URL hash so refreshing doesn't loop back to password reset
+          window.history.replaceState(null, null, window.location.pathname + window.location.search);
+        }} 
+      />
+    );
+  }
+
+  const getUrlError = () => {
+    if (window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const desc = params.get('error_description');
+      if (desc) return decodeURIComponent(desc.replace(/\+/g, ' '));
+    }
+    return null;
+  };
+
   if (!session) {
-    return <AuthScreen />;
+    return <AuthScreen initialError={getUrlError()} />;
   }
 
   return (

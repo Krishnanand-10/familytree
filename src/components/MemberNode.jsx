@@ -48,45 +48,49 @@ const MemberNode = ({ data, id }) => {
 
       {/* Bottom icon strip — animate on parent hover via CSS, buttons animate via Framer */}
       <div className="card-icon-strip">
-        <motion.button
-          className="cis-btn"
-          title="Add Child"
-          whileHover={{ scale: 1.18, backgroundColor: '#2196f3', color: '#fff' }}
-          whileTap={{ scale: 0.88 }}
-          transition={{ duration: 0.15 }}
-          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'child'); }}
-        >
-          <Plus size={14} />
-        </motion.button>
-        <motion.button
-          className="cis-btn"
-          title="Add Spouse"
-          whileHover={{ scale: 1.18, backgroundColor: '#e91e63', color: '#fff' }}
-          whileTap={{ scale: 0.88 }}
-          transition={{ duration: 0.15 }}
-          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'spouse'); }}
-        >
-          <Users size={14} />
-        </motion.button>
-        <motion.button
-          className="cis-btn"
-          title="Add Parent"
-          whileHover={{ scale: 1.18, backgroundColor: '#9c27b0', color: '#fff' }}
-          whileTap={{ scale: 0.88 }}
-          transition={{ duration: 0.15 }}
-          onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'parent'); }}
-        >
-          <UserPlus size={14} />
-        </motion.button>
+        {onAddRelative && (
+          <>
+            <motion.button
+              className="cis-btn"
+              title="Add Child"
+              whileHover={{ scale: 1.18, backgroundColor: '#2196f3', color: '#fff' }}
+              whileTap={{ scale: 0.88 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'child'); }}
+            >
+              <Plus size={14} />
+            </motion.button>
+            <motion.button
+              className="cis-btn"
+              title="Add Spouse"
+              whileHover={{ scale: 1.18, backgroundColor: '#e91e63', color: '#fff' }}
+              whileTap={{ scale: 0.88 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'spouse'); }}
+            >
+              <Users size={14} />
+            </motion.button>
+            <motion.button
+              className="cis-btn"
+              title="Add Parent"
+              whileHover={{ scale: 1.18, backgroundColor: '#9c27b0', color: '#fff' }}
+              whileTap={{ scale: 0.88 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => { e.stopPropagation(); onAddRelative(id, 'parent'); }}
+            >
+              <UserPlus size={14} />
+            </motion.button>
+          </>
+        )}
         <motion.button
           className="cis-btn edit"
-          title="Edit"
+          title={onAddRelative ? "Edit" : "View Profile"}
           whileHover={{ scale: 1.18, backgroundColor: '#ff6b35', color: '#fff' }}
           whileTap={{ scale: 0.88 }}
           transition={{ duration: 0.15 }}
           onClick={(e) => { e.stopPropagation(); onEdit(id); }}
         >
-          <Edit2 size={14} />
+          {onAddRelative ? <Edit2 size={14} /> : <User size={14} />}
         </motion.button>
       </div>
 

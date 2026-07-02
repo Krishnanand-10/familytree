@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Edit2, GitBranch, MapPin, Globe, User, FileText, Calendar, Users, ChevronRight } from 'lucide-react';
 
-export default function MemberProfile({ isOpen, member, nodes, edges, onClose, onEdit, onFindRelation, onSelectMember }) {
+export default function MemberProfile({ isOpen, member, nodes, edges, onClose, onEdit, onFindRelation, onSelectMember, isReadOnly }) {
   // ── Calculate Relatives ────────────────────────────────────────────────────
   const relatives = useMemo(() => {
     if (!member || !nodes || !edges) return { parents: [], children: [], spouses: [] };
@@ -265,16 +265,19 @@ export default function MemberProfile({ isOpen, member, nodes, edges, onClose, o
 
             {/* Actions */}
             <div className="profile-actions">
-              <button
-                className="profile-action-btn primary"
-                onClick={() => onEdit(member.id)}
-              >
-                <Edit2 size={14} />
-                Edit Member
-              </button>
+              {!isReadOnly && (
+                <button
+                  className="profile-action-btn primary"
+                  onClick={() => onEdit(member.id)}
+                >
+                  <Edit2 size={14} />
+                  Edit Member
+                </button>
+              )}
               <button
                 className="profile-action-btn secondary"
                 onClick={() => onFindRelation(member.id)}
+                style={isReadOnly ? { width: '100%' } : {}}
               >
                 <GitBranch size={14} />
                 Find Relation
