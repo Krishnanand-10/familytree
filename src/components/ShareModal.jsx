@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, UserPlus, Trash2, Mail, Shield, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }) => {
   const [shares, setShares] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -14,7 +16,7 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
     if (!branchId || branchId === 'default') return;
     setLoading(true);
     try {
-      const res = await apiFetch(`http://localhost:5000/api/branches/${branchId}/shares`);
+      const res = await apiFetch(`${API_BASE_URL}/api/branches/${branchId}/shares`);
       if (res.ok) {
         const data = await res.json();
         setShares(data);
@@ -47,7 +49,7 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
     setSubmitting(true);
     setStatusMessage({ type: '', text: '' });
     try {
-      const res = await apiFetch(`http://localhost:5000/api/branches/${branchId}/shares`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/branches/${branchId}/shares`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailInput.trim().toLowerCase(), role: roleInput })
@@ -70,7 +72,7 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
 
   const handleRevokeShare = async (shareId) => {
     try {
-      const res = await apiFetch(`http://localhost:5000/api/branches/${branchId}/shares/${shareId}`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/branches/${branchId}/shares/${shareId}`, {
         method: 'DELETE'
       });
       if (res.ok) {

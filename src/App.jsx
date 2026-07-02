@@ -368,6 +368,8 @@ function layoutTree(nodes, edges) {
   return { nodes: newNodes, edges: newEdges };
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 function FlowApp({ session }) {
   const { screenToFlowPosition, fitView, setCenter, getZoom } = useReactFlow();
 
@@ -461,7 +463,7 @@ function FlowApp({ session }) {
     localStorage.setItem('family-tree-edges', JSON.stringify(edges));
 
     try {
-      const res = await apiFetch(`http://localhost:5000/api/tree?branchId=${activeBranchId}`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/tree?branchId=${activeBranchId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodes, edges })
@@ -529,7 +531,7 @@ function FlowApp({ session }) {
     // Persist branch rename to backend if database is online
     if (dbStatus === 'connected') {
       try {
-        await apiFetch('http://localhost:5000/api/branches', {
+        await apiFetch(`${API_BASE_URL}/api/branches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: activeBranchId, name: newName })
@@ -999,7 +1001,7 @@ function FlowApp({ session }) {
   // Helper to fetch family tree from database or local storage
   const fetchTreeForBranch = useCallback(async (branchId) => {
     try {
-      const res = await apiFetch(`http://localhost:5000/api/tree?branchId=${branchId}`);
+      const res = await apiFetch(`${API_BASE_URL}/api/tree?branchId=${branchId}`);
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json();
       
@@ -1072,7 +1074,7 @@ function FlowApp({ session }) {
     // Save to backend database
     if (dbStatus === 'connected') {
       try {
-        await apiFetch('http://localhost:5000/api/branches', {
+        await apiFetch(`${API_BASE_URL}/api/branches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newBranch)
@@ -1104,7 +1106,7 @@ function FlowApp({ session }) {
         // Delete from backend database
         if (dbStatus === 'connected') {
           try {
-            await apiFetch(`http://localhost:5000/api/branches/${branchId}`, {
+            await apiFetch(`${API_BASE_URL}/api/branches/${branchId}`, {
               method: 'DELETE'
             });
           } catch (err) {
@@ -1126,7 +1128,7 @@ function FlowApp({ session }) {
       let isDbConnected = false;
       let dbBranches = [];
       try {
-        const res = await apiFetch('http://localhost:5000/api/branches');
+        const res = await apiFetch(`${API_BASE_URL}/api/branches`);
         if (res.ok) {
           dbBranches = await res.json();
           if (dbBranches && dbBranches.length > 0) {
@@ -1170,7 +1172,7 @@ function FlowApp({ session }) {
           // Sync current branch metadata to backend
           const localBranch = JSON.parse(localStorage.getItem('family-tree-branches') || '[]').find(b => b.id === activeId) || { id: activeId, name: treeName };
           try {
-            const syncRes = await apiFetch('http://localhost:5000/api/branches', {
+            const syncRes = await apiFetch(`${API_BASE_URL}/api/branches`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(localBranch)
@@ -1180,7 +1182,7 @@ function FlowApp({ session }) {
               const newBranchId = syncData.data?.id;
 
               // Reload branches
-              const reloadRes = await apiFetch('http://localhost:5000/api/branches');
+              const reloadRes = await apiFetch(`${API_BASE_URL}/api/branches`);
               if (reloadRes.ok) {
                 const latestBranches = await reloadRes.json();
                 setBranches(latestBranches);
