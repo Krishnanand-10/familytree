@@ -22,7 +22,7 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, LogOut, Share2 } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, LogOut, Share2, Settings, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BranchSwitcher from './components/BranchSwitcher';
 import CustomDialog from './components/CustomDialog';
@@ -424,6 +424,8 @@ function FlowApp({ session }) {
   const [dbStatus, setDbStatus] = useState('loading'); // 'loading', 'connected', 'fallback'
   const [isSaving, setIsSaving] = useState(false);
   const [saveToastMsg, setSaveToastMsg] = useState('Tree saved successfully');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
     const activeId = localStorage.getItem('family-tree-active-branch') || 'default';
@@ -978,22 +980,23 @@ function FlowApp({ session }) {
       setNodes(newNodes);
       setEdges(newEdges);
       takeSnapshot();
-      if (shouldRearrange) {
-        if (focusNodeId) {
-          const targetNode = newNodes.find(n => n.id === focusNodeId);
-          if (targetNode) {
-            setTimeout(() => {
-              const currentZoom = getZoom();
-              // Pan just enough so the new card sits near the bottom of the screen
-              setCenter(targetNode.position.x + 80, targetNode.position.y + 40 - 150, {
-                zoom: currentZoom,
-                duration: 800
-              });
-            }, 150);
-          }
-        } else {
-          setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 150);
+    }
+
+    if (shouldRearrange) {
+      if (focusNodeId) {
+        const targetNode = newNodes.find(n => n.id === focusNodeId);
+        if (targetNode) {
+          setTimeout(() => {
+            const currentZoom = getZoom();
+            // Pan just enough so the new card sits near the bottom of the screen
+            setCenter(targetNode.position.x + 80, targetNode.position.y + 40 - 150, {
+              zoom: currentZoom,
+              duration: 800
+            });
+          }, 150);
         }
+      } else {
+        setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 150);
       }
     }
   }, [setNodes, setEdges, takeSnapshot, fitView, getZoom, setCenter]);
@@ -1673,62 +1676,13 @@ function FlowApp({ session }) {
         </div>
         <div className="k-header-right">
           <div className="k-btn-group">
-            <button className="k-tool-btn" onClick={undo} title="Undo (Ctrl+Z)" disabled={history.length === 0}>
-              <Undo2 size={15} />
+            <button className="k-tool-btn accent" onClick={rearrangeEverything} disabled={activeBranchRole === 'viewer'} title="Magic Align">
+              <Wand2 size={15} />
             </button>
-            <button className="k-tool-btn" onClick={redo} title="Redo (Ctrl+Y)" disabled={redoStack.length === 0}>
-              <Redo2 size={15} />
+            <button className="k-tool-btn danger" onClick={handleClearTree} disabled={activeBranchRole === 'viewer'} title="Clear entire tree">
+              <Trash2 size={15} />
             </button>
           </div>
-
-          <div className="k-divider-v" />
-
-          <button className="k-tool-btn accent" onClick={rearrangeEverything} disabled={activeBranchRole === 'viewer'} title="Magic Align">
-            <Wand2 size={15} />
-            <span>Align</span>
-          </button>
-
-          <button className="k-tool-btn danger" onClick={handleClearTree} disabled={activeBranchRole === 'viewer'} title="Clear entire tree">
-            <Trash2 size={15} />
-          </button>
-
-          <div className="k-divider-v" />
-
-          {/* Export dropdown */}
-          <div className="export-dropdown-wrap">
-            <button
-              className="k-tool-btn"
-              onClick={() => setShowExportMenu(v => !v)}
-              title="Export"
-            >
-              <Download size={15} />
-              <span>Export</span>
-            </button>
-            {showExportMenu && (
-              <div className="export-dropdown" onMouseLeave={() => setShowExportMenu(false)}>
-                <button className="export-opt" onClick={handleExportTree}>
-                  <Download size={14} /> JSON Backup
-                </button>
-                <button className="export-opt" onClick={handleExportPNG}>
-                  <Download size={14} /> PNG Image
-                </button>
-                <button className="export-opt" onClick={handleExportPDF}>
-                  <Download size={14} /> PDF
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button className="k-tool-btn" onClick={handleImportClick} disabled={activeBranchRole === 'viewer'} title="Import Backup (JSON)">
-            <Upload size={15} />
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              accept=".json"
-              onChange={handleImportTree}
-            />
-          </button>
 
           <div className="k-divider-v" />
 
@@ -1737,25 +1691,91 @@ function FlowApp({ session }) {
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
 
-          {activeBranchRole === 'owner' && (
-            <>
-              <div className="k-divider-v" />
-              <button className="k-tool-btn" onClick={() => setIsShareModalOpen(true)} title="Share Tree">
-                <Share2 size={15} />
-                <span>Share</span>
-              </button>
-            </>
-          )}
+          <div className="k-divider-v" />
+
+          {/* Tools/Actions Dropdown */}
+          <div className="export-dropdown-wrap">
+            <button
+              className="k-tool-btn"
+              onClick={() => setShowToolsMenu(v => !v)}
+              title="Backup, Export & Import Options"
+            >
+              <Settings size={15} />
+              <span>Tools</span>
+              <ChevronDown size={12} />
+            </button>
+            {showToolsMenu && (
+              <div className="export-dropdown" onMouseLeave={() => setShowToolsMenu(false)}>
+                {activeBranchRole === 'owner' && (
+                  <button className="export-opt" onClick={() => { setIsShareModalOpen(true); setShowToolsMenu(false); }}>
+                    <Share2 size={14} /> Share Tree
+                  </button>
+                )}
+                {activeBranchRole === 'owner' && <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '4px 0' }} />}
+                <button className="export-opt" onClick={() => { handleExportTree(); setShowToolsMenu(false); }}>
+                  <Download size={14} /> Export JSON
+                </button>
+                <button className="export-opt" onClick={() => { handleExportPNG(); setShowToolsMenu(false); }}>
+                  <Download size={14} /> Export PNG
+                </button>
+                <button className="export-opt" onClick={() => { handleExportPDF(); setShowToolsMenu(false); }}>
+                  <Download size={14} /> Export PDF
+                </button>
+                <button className="export-opt" onClick={() => { handleImportClick(); setShowToolsMenu(false); }} disabled={activeBranchRole === 'viewer'}>
+                  <Upload size={14} /> Import JSON
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept=".json"
+                  onChange={handleImportTree}
+                />
+              </div>
+            )}
+          </div>
 
           <div className="k-divider-v" />
 
-          <div className="user-profile-wrap">
-            <span className="user-email" title={session?.user?.email}>
-              {session?.user?.email ? session.user.email.split('@')[0] : 'User'}
-            </span>
-            <button className="k-logout-btn" onClick={() => supabase.auth.signOut()} title="Log Out">
-              <LogOut size={15} />
+          {/* Professional Profile Avatar Button and Dropdown */}
+          <div className="user-avatar-container">
+            <button 
+              className="user-avatar-btn" 
+              onClick={() => setShowProfileMenu(prev => !prev)}
+              title={session?.user?.email || 'User Menu'}
+            >
+              {session?.user?.user_metadata?.avatar_url ? (
+                <img 
+                  src={session.user.user_metadata.avatar_url} 
+                  alt="User Avatar" 
+                  className="user-avatar-img"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="user-avatar-fallback">
+                  {session?.user?.email ? session.user.email.charAt(0).toUpperCase() : 'U'}
+                </div>
+              )}
             </button>
+            {showProfileMenu && (
+              <div className="user-profile-dropdown" onMouseLeave={() => setShowProfileMenu(false)}>
+                <div className="user-profile-info">
+                  <span className="user-profile-email" title={session?.user?.email}>
+                    {session?.user?.email || 'Logged In User'}
+                  </span>
+                  {activeBranchRole && (
+                    <span className="user-profile-role">
+                      Role: {activeBranchRole.charAt(0).toUpperCase() + activeBranchRole.slice(1)}
+                    </span>
+                  )}
+                </div>
+                <div className="user-profile-divider" />
+                <button className="user-profile-opt logout" onClick={() => supabase.auth.signOut()}>
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1783,6 +1803,16 @@ function FlowApp({ session }) {
           <MiniMap />
           <Background variant="dots" gap={12} size={1} />
         </ReactFlow>
+
+        {/* Floating Canvas History Controls */}
+        <div className="canvas-history-controls">
+          <button className="history-control-btn" onClick={undo} title="Undo (Ctrl+Z)" disabled={history.length === 0}>
+            <Undo2 size={16} />
+          </button>
+          <button className="history-control-btn" onClick={redo} title="Redo (Ctrl+Y)" disabled={redoStack.length === 0}>
+            <Redo2 size={16} />
+          </button>
+        </div>
 
         {activeBranchRole !== 'viewer' && (
           <motion.button
