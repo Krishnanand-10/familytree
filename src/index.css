@@ -186,7 +186,6 @@ body {
   transition: all 0.18s ease;
   white-space: nowrap;
   outline: none;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .k-tool-btn:focus-visible {
@@ -245,7 +244,6 @@ body {
   transition: all 0.18s ease;
   letter-spacing: 0.1px;
   outline: none;
-  -webkit-tap-highlight-color: transparent;
   white-space: nowrap;
 }
 
@@ -2231,6 +2229,7 @@ body {
   letter-spacing: -0.8px;
   background: linear-gradient(135deg, #ffffff 50%, #f3f4f6 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
