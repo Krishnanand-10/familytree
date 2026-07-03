@@ -1700,7 +1700,7 @@ function FlowApp({ session, onSessionUpdate }) {
           </button>
 
           {activeBranchRole === 'owner' && (
-            <button className="k-tool-btn" onClick={() => setIsShareModalOpen(true)} title="Share this family tree">
+            <button className="k-tool-btn accent" onClick={() => setIsShareModalOpen(true)} title="Share this family tree">
               <Share2 size={18} /><span>Share</span>
             </button>
           )}
@@ -1708,7 +1708,7 @@ function FlowApp({ session, onSessionUpdate }) {
           {/* Export/Import Dropdown */}
           <div className="export-dropdown-wrap">
             <button
-              className="k-tool-btn"
+              className="k-tool-btn accent"
               onClick={() => setShowToolsMenu(v => !v)}
               title="Export or Import family tree data"
             >
