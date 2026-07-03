@@ -145,9 +145,25 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
                     <motion.button
                       type="submit"
                       disabled={submitting}
-                      className="k-save-btn"
-                      style={{ padding: '10px 16px', height: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      whileHover={{ scale: 1.02 }}
+                      style={{
+                        padding: '10px 20px',
+                        height: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#1a1a1a',
+                        color: '#ffffff',
+                        border: '1px solid rgba(0,0,0,0.15)',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        cursor: submitting ? 'default' : 'pointer',
+                        opacity: submitting ? 0.6 : 1,
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}
+                      whileHover={{ opacity: submitting ? 0.6 : 0.85 }}
                       whileTap={{ scale: 0.98 }}
                     >
                       {submitting ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}

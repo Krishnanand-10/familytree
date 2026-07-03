@@ -51,7 +51,7 @@ export default function BranchSwitcher({
     <div className="branch-switcher" ref={ref}>
       <div className="branch-trigger-container">
         <div className="branch-icon-wrap" onClick={() => setOpen(v => !v)} title="Toggle list of trees">
-          <TreePine size={14} />
+          <TreePine size={17} />
         </div>
         
         <input
@@ -68,7 +68,7 @@ export default function BranchSwitcher({
           onClick={() => setOpen(v => !v)}
           title="Switch Family Tree"
         >
-          <ChevronDown size={13} className={`branch-chevron ${open ? 'open' : ''}`} />
+          <ChevronDown size={16} className={`branch-chevron ${open ? 'open' : ''}`} />
         </button>
       </div>
 

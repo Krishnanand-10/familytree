@@ -30,6 +30,8 @@ import { supabase } from './supabaseClient';
 import AuthScreen from './components/AuthScreen';
 import ShareModal from './components/ShareModal';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
+import UserProfileSettingsModal from './components/UserProfileSettingsModal';
+
 
 const nodeTypes = {
   member: MemberNode,
@@ -370,7 +372,7 @@ function layoutTree(nodes, edges) {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-function FlowApp({ session }) {
+function FlowApp({ session, onSessionUpdate }) {
   const { screenToFlowPosition, fitView, setCenter, getZoom } = useReactFlow();
 
   const apiFetch = useCallback(async (url, options = {}) => {
@@ -425,6 +427,7 @@ function FlowApp({ session }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveToastMsg, setSaveToastMsg] = useState('Tree saved successfully');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(() => {
@@ -1623,35 +1626,40 @@ function FlowApp({ session }) {
   return (
     <>
       <header className="k-header">
-        <div className="k-header-left">
-          <div className="k-logo">
-            <div className="k-logo-icon">
-              <TreePine size={18} />
-            </div>
-            <span className="k-logo-text">Kinship</span>
-          </div>
 
-          <div className="k-divider-v" />
-
-          <BranchSwitcher
-            branches={branches}
-            activeBranchId={activeBranchId}
-            onSwitch={switchBranch}
-            onCreate={createBranch}
-            onDelete={deleteBranch}
-            treeName={treeName}
-            setTreeName={handleTreeNameChange}
-          />
-
-          <div className={`db-status-badge ${dbStatus}`}>
-            <span className="db-status-dot" />
-            <span>{dbStatus === 'connected' ? 'Cloud Sync' : dbStatus === 'loading' ? 'Connecting...' : 'Local Mode'}</span>
-          </div>
+        {/* Logo */}
+        <div className="k-logo">
+          <div className="k-logo-icon"><TreePine size={21} /></div>
+          <span className="k-logo-text">Kinship</span>
         </div>
 
-        <div className="k-header-center">
+        <div className="k-divider-v" />
+
+        {/* Branch Switcher */}
+        <BranchSwitcher
+          branches={branches}
+          activeBranchId={activeBranchId}
+          onSwitch={switchBranch}
+          onCreate={createBranch}
+          onDelete={deleteBranch}
+          treeName={treeName}
+          setTreeName={handleTreeNameChange}
+        />
+
+        <div className="k-divider-v" />
+
+        {/* Cloud Sync Status */}
+        <div className={`db-status-badge ${dbStatus}`}>
+          <span className="db-status-dot" />
+          <span>{dbStatus === 'connected' ? 'Cloud Sync' : dbStatus === 'loading' ? 'Connecting...' : 'Local Mode'}</span>
+        </div>
+
+        <div className="k-divider-v" />
+
+        {/* Search — flex:1 so it fills the middle */}
+        <div className="k-search-box-wrap" style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           <div className="k-search-box">
-            <Search size={15} />
+            <Search size={17} />
             <input
               type="text"
               placeholder="Search people…"
@@ -1674,44 +1682,40 @@ function FlowApp({ session }) {
             </div>
           )}
         </div>
-        <div className="k-header-right">
-          <div className="k-btn-group">
-            <button className="k-tool-btn accent" onClick={rearrangeEverything} disabled={activeBranchRole === 'viewer'} title="Magic Align">
-              <Wand2 size={15} />
-            </button>
-            <button className="k-tool-btn danger" onClick={handleClearTree} disabled={activeBranchRole === 'viewer'} title="Clear entire tree">
-              <Trash2 size={15} />
-            </button>
-          </div>
 
-          <div className="k-divider-v" />
+        <div className="k-divider-v" />
 
-          <button className="k-save-btn" onClick={handleSaveClick} disabled={isSaving || activeBranchRole === 'viewer'}>
-            <Save size={15} />
-            <span>{isSaving ? 'Saving...' : 'Save'}</span>
+        {/* Action Buttons — all inline, equal gap */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <button className="k-tool-btn accent" onClick={rearrangeEverything} disabled={activeBranchRole === 'viewer'} title="Magic Align">
+            <Wand2 size={18} /><span>Align</span>
           </button>
 
-          <div className="k-divider-v" />
+          <button className="k-tool-btn danger" onClick={handleClearTree} disabled={activeBranchRole === 'viewer'} title="Clear entire tree">
+            <Trash2 size={18} /><span>Delete</span>
+          </button>
 
-          {/* Tools/Actions Dropdown */}
+          <button className="k-save-btn" onClick={handleSaveClick} disabled={isSaving || activeBranchRole === 'viewer'}>
+            <Save size={17} /><span>{isSaving ? 'Saving...' : 'Save'}</span>
+          </button>
+
+          {activeBranchRole === 'owner' && (
+            <button className="k-tool-btn" onClick={() => setIsShareModalOpen(true)} title="Share this family tree">
+              <Share2 size={18} /><span>Share</span>
+            </button>
+          )}
+
+          {/* Export/Import Dropdown */}
           <div className="export-dropdown-wrap">
             <button
               className="k-tool-btn"
               onClick={() => setShowToolsMenu(v => !v)}
-              title="Backup, Export & Import Options"
+              title="Export or Import family tree data"
             >
-              <Settings size={15} />
-              <span>Tools</span>
-              <ChevronDown size={12} />
+              <Download size={18} />
             </button>
             {showToolsMenu && (
               <div className="export-dropdown" onMouseLeave={() => setShowToolsMenu(false)}>
-                {activeBranchRole === 'owner' && (
-                  <button className="export-opt" onClick={() => { setIsShareModalOpen(true); setShowToolsMenu(false); }}>
-                    <Share2 size={14} /> Share Tree
-                  </button>
-                )}
-                {activeBranchRole === 'owner' && <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '4px 0' }} />}
                 <button className="export-opt" onClick={() => { handleExportTree(); setShowToolsMenu(false); }}>
                   <Download size={14} /> Export JSON
                 </button>
@@ -1724,60 +1728,51 @@ function FlowApp({ session }) {
                 <button className="export-opt" onClick={() => { handleImportClick(); setShowToolsMenu(false); }} disabled={activeBranchRole === 'viewer'}>
                   <Upload size={14} /> Import JSON
                 </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  accept=".json"
-                  onChange={handleImportTree}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="k-divider-v" />
-
-          {/* Professional Profile Avatar Button and Dropdown */}
-          <div className="user-avatar-container">
-            <button 
-              className="user-avatar-btn" 
-              onClick={() => setShowProfileMenu(prev => !prev)}
-              title={session?.user?.email || 'User Menu'}
-            >
-              {session?.user?.user_metadata?.avatar_url ? (
-                <img 
-                  src={session.user.user_metadata.avatar_url} 
-                  alt="User Avatar" 
-                  className="user-avatar-img"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="user-avatar-fallback">
-                  {session?.user?.email ? session.user.email.charAt(0).toUpperCase() : 'U'}
-                </div>
-              )}
-            </button>
-            {showProfileMenu && (
-              <div className="user-profile-dropdown" onMouseLeave={() => setShowProfileMenu(false)}>
-                <div className="user-profile-info">
-                  <span className="user-profile-email" title={session?.user?.email}>
-                    {session?.user?.email || 'Logged In User'}
-                  </span>
-                  {activeBranchRole && (
-                    <span className="user-profile-role">
-                      Role: {activeBranchRole.charAt(0).toUpperCase() + activeBranchRole.slice(1)}
-                    </span>
-                  )}
-                </div>
-                <div className="user-profile-divider" />
-                <button className="user-profile-opt logout" onClick={() => supabase.auth.signOut()}>
-                  <LogOut size={14} />
-                  <span>Sign Out</span>
-                </button>
+                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleImportTree} />
               </div>
             )}
           </div>
         </div>
+
+        <div className="k-divider-v" />
+
+        {/* Avatar */}
+        <button
+          className="user-avatar-btn"
+          onClick={() => setShowProfileSettings(true)}
+          title={session?.user?.email || 'User Menu'}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            width: '38px',
+            height: '38px',
+            flexShrink: 0
+          }}
+        >
+          {session?.user?.user_metadata?.avatar_url ? (
+            <img
+              src={session.user.user_metadata.avatar_url}
+              alt="User Avatar"
+              referrerPolicy="no-referrer"
+              style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+            />
+          ) : (
+            <div style={{
+              width: '30px', height: '30px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)',
+              color: 'white', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: '14px', fontWeight: '700'
+            }}>
+              {session?.user?.email ? session.user.email.charAt(0).toUpperCase() : 'U'}
+            </div>
+          )}
+        </button>
 
       </header>
 
@@ -1860,6 +1855,14 @@ function FlowApp({ session }) {
         apiFetch={apiFetch}
         userEmail={session?.user?.email || ''}
         userRole={activeBranchRole}
+      />
+
+      {/* User Profile Settings Modal */}
+      <UserProfileSettingsModal
+        isOpen={showProfileSettings}
+        onClose={() => setShowProfileSettings(false)}
+        session={session}
+        onSessionUpdate={onSessionUpdate}
       />
 
       {/* Relationship Finder */}
@@ -1964,7 +1967,7 @@ export default function App() {
 
   return (
     <ReactFlowProvider>
-      <FlowApp session={session} />
+      <FlowApp session={session} onSessionUpdate={setSession} />
     </ReactFlowProvider>
   );
 }
