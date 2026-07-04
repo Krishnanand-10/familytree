@@ -153,6 +153,7 @@ export default function AuthScreen({ initialError }) {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -171,6 +172,7 @@ export default function AuthScreen({ initialError }) {
                     disabled={loading}
                     required
                     style={{ paddingRight: '40px' }}
+                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
                   />
                   <button
                     type="button"
