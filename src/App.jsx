@@ -31,6 +31,7 @@ import AuthScreen from './components/AuthScreen';
 import ShareModal from './components/ShareModal';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
 import UserProfileSettingsModal from './components/UserProfileSettingsModal';
+import InvitationBell from './components/InvitationBell';
 
 
 const nodeTypes = {
@@ -1645,6 +1646,35 @@ function FlowApp({ session, onSessionUpdate }) {
           onSwitch={switchBranch}
           onCreate={createBranch}
           onDelete={deleteBranch}
+          onLeave={async (branchId, branchName) => {
+            triggerConfirm(
+              'Leave Shared Tree',
+              `Leave "${branchName}"? You will lose access and need to be invited again.`,
+              async () => {
+                try {
+                  await apiFetch(`${API_BASE_URL}/api/branches/${branchId}/leave`, { method: 'DELETE' });
+                  const updated = branches.filter(b => b.id !== branchId);
+                  setBranches(updated);
+                  localStorage.setItem('family-tree-branches', JSON.stringify(updated));
+
+                  // If we left the active branch, manually switch to the first remaining one
+                  if (branchId === activeBranchId && updated.length > 0) {
+                    const next = updated[0];
+                    const { nodes: newNodes, edges: newEdges } = await fetchTreeForBranch(next.id);
+                    setNodes(newNodes);
+                    setEdges(newEdges);
+                    setActiveBranchId(next.id);
+                    setTreeName(next.name);
+                    setActiveBranchRole(next.role || 'owner');
+                    localStorage.setItem('family-tree-active-branch', next.id);
+                    setTimeout(() => fitView({ duration: 600, padding: 0.2 }), 200);
+                  }
+                } catch (err) {
+                  console.warn('Could not leave branch:', err);
+                }
+              }
+            );
+          }}
           treeName={treeName}
           setTreeName={handleTreeNameChange}
         />
@@ -1707,6 +1737,23 @@ function FlowApp({ session, onSessionUpdate }) {
               <Share2 size={18} /><span>Share</span>
             </button>
           )}
+
+          {/* Invitation Bell */}
+          <InvitationBell
+            apiFetch={apiFetch}
+            onInvitationAccepted={async () => {
+              try {
+                const res = await apiFetch(`${API_BASE_URL}/api/branches`);
+                if (res.ok) {
+                  const dbBranches = await res.json();
+                  setBranches(dbBranches);
+                  localStorage.setItem('family-tree-branches', JSON.stringify(dbBranches));
+                }
+              } catch (err) {
+                console.warn('Could not refresh branches after accepting invitation:', err);
+              }
+            }}
+          />
 
           {/* Export/Import Dropdown */}
           <div className="export-dropdown-wrap">

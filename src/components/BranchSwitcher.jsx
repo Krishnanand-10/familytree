@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Plus, Trash2, TreePine } from 'lucide-react';
+import { ChevronDown, Plus, Trash2, TreePine, LogOut } from 'lucide-react';
 
 /**
  * BranchSwitcher
@@ -12,6 +12,7 @@ export default function BranchSwitcher({
   onSwitch,
   onCreate,
   onDelete,
+  onLeave,
   treeName,
   setTreeName,
 }) {
@@ -103,6 +104,19 @@ export default function BranchSwitcher({
                     }}
                   >
                     <Trash2 size={12} />
+                  </button>
+                )}
+                {branch.role !== 'owner' && (
+                  <button
+                    className="branch-delete-btn"
+                    title="Leave shared tree"
+                    style={{ color: '#f97316' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLeave(branch.id, branch.name);
+                    }}
+                  >
+                    <LogOut size={12} />
                   </button>
                 )}
               </div>

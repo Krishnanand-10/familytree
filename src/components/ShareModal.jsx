@@ -89,6 +89,26 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
     }
   };
 
+  const handleUpdateRole = async (shareId, newRole) => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/branches/${branchId}/shares/${shareId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+      if (res.ok) {
+        setStatusMessage({ type: 'success', text: 'Permission updated successfully.' });
+        fetchShares();
+      } else {
+        const errData = await res.json();
+        setStatusMessage({ type: 'error', text: errData.error || 'Failed to update permission.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusMessage({ type: 'error', text: 'Error connecting to server.' });
+    }
+  };
+
   const isOwner = userRole === 'owner';
 
   return (
@@ -223,12 +243,40 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
                         border: '1px solid var(--border-color)'
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                         <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>{share.shared_with_email}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {share.role === 'editor' ? <ShieldCheck size={12} style={{ color: 'var(--accent-color)' }} /> : <Shield size={12} />}
-                          {share.role.charAt(0).toUpperCase() + share.role.slice(1)}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {share.role === 'editor' ? <ShieldCheck size={12} style={{ color: 'var(--accent-color)' }} /> : <Shield size={12} style={{ color: 'var(--text-muted)' }} />}
+                          {isOwner ? (
+                            <select
+                              value={share.role}
+                              onChange={(e) => handleUpdateRole(share.id, e.target.value)}
+                              style={{
+                                fontSize: '11px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                padding: '2px 4px',
+                                outline: 'none',
+                                borderRadius: '4px',
+                                borderBottom: '1px dashed var(--border-color)'
+                              }}
+                            >
+                              <option value="viewer">Viewer</option>
+                              <option value="editor">Editor</option>
+                            </select>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {share.role.charAt(0).toUpperCase() + share.role.slice(1)}
+                            </span>
+                          )}
+                          {share.status === 'pending' && (
+                            <span style={{ fontSize: '10px', color: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto' }}>
+                              Pending
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       {isOwner && (
@@ -243,7 +291,8 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            marginLeft: '8px'
                           }}
                           whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
                           whileTap={{ scale: 0.95 }}

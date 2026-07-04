@@ -80,11 +80,12 @@ app.get('/api/branches', requireAuth, async (req, res) => {
       .select('*')
       .eq('user_id', req.user.id);
 
-    // 2. Get branches shared with the user
+    // 2. Get branches shared with the user (only ACCEPTED ones appear in the switcher)
     const { data: shares, error: sharesError } = await req.supabase
       .from('branch_shares')
       .select('branch_id, role, family_branches(*)')
-      .eq('shared_with_email', req.user.email);
+      .eq('shared_with_email', req.user.email)
+      .eq('status', 'accepted');
 
     if (ownedError) throw ownedError;
     if (sharesError) throw sharesError;
@@ -204,7 +205,8 @@ app.post('/api/branches/:id/shares', requireAuth, async (req, res) => {
       .upsert({
         branch_id: branchId,
         shared_with_email: email.trim().toLowerCase(),
-        role: role
+        role: role,
+        status: 'pending'
       }, {
         onConflict: 'branch_id,shared_with_email'
       })
@@ -214,6 +216,59 @@ app.post('/api/branches/:id/shares', requireAuth, async (req, res) => {
     res.json({ success: true, data: data?.[0] });
   } catch (error) {
     console.error('Error creating share:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET: Fetch pending invitations for the logged-in user
+app.get('/api/invitations', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await req.supabase
+      .from('branch_shares')
+      .select('id, role, status, branch_id, family_branches(id, name)')
+      .eq('shared_with_email', req.user.email)
+      .eq('status', 'pending');
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    console.error('Error fetching invitations:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST: Accept an invitation
+app.post('/api/invitations/:shareId/accept', requireAuth, async (req, res) => {
+  const { shareId } = req.params;
+  try {
+    const { error } = await req.supabase
+      .from('branch_shares')
+      .update({ status: 'accepted' })
+      .eq('id', shareId)
+      .eq('shared_with_email', req.user.email);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error accepting invitation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE: Decline an invitation
+app.delete('/api/invitations/:shareId', requireAuth, async (req, res) => {
+  const { shareId } = req.params;
+  try {
+    const { error } = await req.supabase
+      .from('branch_shares')
+      .delete()
+      .eq('id', shareId)
+      .eq('shared_with_email', req.user.email);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error declining invitation:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -234,6 +289,48 @@ app.delete('/api/branches/:id/shares/:shareId', requireAuth, async (req, res) =>
     res.status(500).json({ error: error.message });
   }
 });
+
+// PATCH: Update collaborator role (Protected)
+app.patch('/api/branches/:id/shares/:shareId', requireAuth, async (req, res) => {
+  const shareId = req.params.shareId;
+  const { role } = req.body;
+  
+  if (!role || !['viewer', 'editor'].includes(role)) {
+    return res.status(400).json({ error: 'Valid role is required.' });
+  }
+
+  try {
+    const { error } = await req.supabase
+      .from('branch_shares')
+      .update({ role })
+      .eq('id', shareId);
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Role updated successfully.' });
+  } catch (error) {
+    console.error('Error updating share role:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE: Leave a shared tree (collaborator removes themselves)
+app.delete('/api/branches/:id/leave', requireAuth, async (req, res) => {
+  const branchId = req.params.id === 'default' ? DEFAULT_BRANCH_ID : req.params.id;
+  try {
+    const { error } = await req.supabase
+      .from('branch_shares')
+      .delete()
+      .eq('branch_id', branchId)
+      .eq('shared_with_email', req.user.email);
+
+    if (error) throw error;
+    res.json({ success: true, message: 'You have left this shared tree.' });
+  } catch (error) {
+    console.error('Error leaving branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // GET: Load family tree nodes and edges from Supabase (Protected)
 app.get('/api/tree', requireAuth, async (req, res) => {
