@@ -40,3 +40,18 @@ CREATE POLICY "DevMode" ON public.relationships FOR ALL USING (true);
 INSERT INTO public.family_branches (id, name)
 VALUES ('00000000-0000-0000-0000-000000000000', 'The Smith Family')
 ON CONFLICT (id) DO NOTHING;
+
+-- Collaborator Sharing and Invitations
+CREATE TABLE IF NOT EXISTS public.branch_shares (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    branch_id UUID REFERENCES public.family_branches(id) ON DELETE CASCADE,
+    shared_with_email TEXT NOT NULL,
+    role TEXT CHECK (role IN ('viewer', 'editor')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT branch_shares_branch_id_email_key UNIQUE (branch_id, shared_with_email)
+);
+
+ALTER TABLE public.branch_shares ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "DevMode" ON public.branch_shares FOR ALL USING (true);
+
