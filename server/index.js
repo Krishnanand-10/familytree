@@ -74,15 +74,34 @@ app.get('/api/health', (req, res) => {
 // GET: Fetch all family branches (Protected)
 app.get('/api/branches', requireAuth, async (req, res) => {
   try {
-    const { data: branches, error } = await req.supabase
+    // 1. Get branches owned by the user
+    const { data: ownedBranches, error: ownedError } = await req.supabase
       .from('family_branches')
       .select('*')
-      .order('created_at', { ascending: true });
+      .eq('user_id', req.user.id);
 
-    if (error) throw error;
+    // 2. Get branches shared with the user
+    const { data: shares, error: sharesError } = await req.supabase
+      .from('branch_shares')
+      .select('branch_id, role, family_branches(*)')
+      .eq('shared_with_email', req.user.email);
 
-    // Automatically provision a default branch for this new user if they have none
-    if (!branches || branches.length === 0) {
+    if (ownedError) throw ownedError;
+    if (sharesError) throw sharesError;
+
+    // 3. Merge results
+    const owned = (ownedBranches || []).map(b => ({ ...b, role: 'owner' }));
+    const shared = (shares || [])
+      .filter(s => s.family_branches)
+      .map(s => ({ ...s.family_branches, role: s.role }));
+
+    const allBranches = [...owned, ...shared];
+    
+    // Deduplicate (in case user owns and is shared on same branch)
+    const uniqueBranches = Array.from(new Map(allBranches.map(b => [b.id, b])).values());
+
+    // Provision default if user has no branches at all
+    if (uniqueBranches.length === 0) {
       const emailName = req.user.email ? req.user.email.split('@')[0] : 'My';
       const displayName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
       
@@ -95,29 +114,10 @@ app.get('/api/branches', requireAuth, async (req, res) => {
         .select();
 
       if (createError) throw createError;
-      const provisioned = newBranch ? [{ ...newBranch[0], role: 'owner' }] : [];
-      return res.json(provisioned);
+      return res.json(newBranch ? [{ ...newBranch[0], role: 'owner' }] : []);
     }
 
-    // Fetch active shares for this user's email to associate roles
-    const { data: shares, error: sharesError } = await req.supabase
-      .from('branch_shares')
-      .select('*')
-      .eq('shared_with_email', req.user.email);
-
-    if (sharesError) {
-      console.warn('Could not load branch shares:', sharesError);
-    }
-
-    const branchesWithRole = (branches || []).map(b => {
-      if (b.user_id === req.user.id) {
-        return { ...b, role: 'owner' };
-      }
-      const share = (shares || []).find(s => s.branch_id === b.id);
-      return { ...b, role: share ? share.role : 'viewer' };
-    });
-
-    res.json(branchesWithRole);
+    res.json(uniqueBranches);
   } catch (error) {
     console.error('Error fetching branches:', error);
     res.status(500).json({ error: error.message });
