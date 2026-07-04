@@ -105,8 +105,8 @@ function interpretPath(path, nodes) {
     if (s === 'parent') return g('Father', 'Mother', 'Parent');
     if (s === 'child')  return g('Son', 'Daughter', 'Child');
     
-    if (s === 'parent,parent') return g('Grandfather', 'Grandmother', 'Grandparent');
-    if (s === 'child,child')   return g('Grandson', 'Granddaughter', 'Grandchild');
+    if (s === 'parent,parent') return g('Grand Father', 'Grand Mother', 'Grand Parent');
+    if (s === 'child,child')   return g('Grand Son', 'Grand Daughter', 'Grand Child');
     if (s === 'parent,child')  return g('Brother', 'Sister', 'Sibling');
     if (s === 'child,parent')  return g('Husband', 'Wife', 'Spouse');
     
@@ -116,17 +116,17 @@ function interpretPath(path, nodes) {
     if (s === 'child,parent,parent') return g('Father-in-Law', 'Mother-in-Law', 'Parent-in-Law');
     if (s === 'parent,child,parent,child') return g('Brother', 'Sister', 'Sibling');
     
-    if (s === 'parent,parent,parent') return g('Great-Grandfather', 'Great-Grandmother', 'Great-Grandparent');
-    if (s === 'child,child,child')    return g('Great-Grandson', 'Great-Granddaughter', 'Great-Grandchild');
+    if (s === 'parent,parent,parent') return g('Great Grand Father', 'Great Grand Mother', 'Great Grand Parent');
+    if (s === 'child,child,child')    return g('Great Grand Son', 'Great Grand Daughter', 'Great Grand Child');
     if (s === 'parent,parent,child') return g('Uncle', 'Aunt', 'Uncle/Aunt');
     if (s === 'parent,child,child') return g('Nephew', 'Niece', 'Nephew/Niece');
     
     if (s === 'parent,parent,child,child') return 'Cousin';
-    if (s === 'parent,parent,parent,child') return g('Great-Uncle', 'Great-Aunt', 'Great-Uncle/Aunt');
-    if (s === 'parent,child,child,child') return g('Great-Nephew', 'Great-Niece', 'Great-Nephew/Niece');
+    if (s === 'parent,parent,parent,child') return g('Great Uncle', 'Great Aunt', 'Great Uncle/Aunt');
+    if (s === 'parent,child,child,child') return g('Great Nephew', 'Great Niece', 'Great Nephew/Niece');
     
-    if (s === 'parent,parent,parent,parent') return g('Great-Great-Grandfather', 'Great-Great-Grandmother', 'Great-Great-Grandparent');
-    if (s === 'child,child,child,child')     return g('Great-Great-Grandson', 'Great-Great-Granddaughter', 'Great-Great-Grandchild');
+    if (s === 'parent,parent,parent,parent') return g('Great Great Grand Father', 'Great Great Grand Mother', 'Great Great Grand Parent');
+    if (s === 'child,child,child,child')     return g('Great Great Grand Son', 'Great Great Grand Daughter', 'Great Great Grand Child');
     
     if (s === 'parent,parent,parent,child,child') return 'Cousin';
     if (s === 'parent,parent,child,child,child') return 'Cousin';
@@ -143,12 +143,12 @@ function interpretPath(path, nodes) {
     const ups = subVias.filter(v => v === 'parent').length;
     const downs = subVias.filter(v => v === 'child').length;
     if (ups > 0 && downs === 0) {
-      const prefix = 'Great-'.repeat(ups - 2);
-      return `${prefix}Great-${g('Grandfather', 'Grandmother', 'Grandparent')}`;
+      const prefix = 'Great '.repeat(ups - 2);
+      return `${prefix}Great ${g('Grand Father', 'Grand Mother', 'Grand Parent')}`;
     }
     if (downs > 0 && ups === 0) {
-      const prefix = 'Great-'.repeat(downs - 2);
-      return `${prefix}Great-${g('Grandson', 'Granddaughter', 'Grandchild')}`;
+      const prefix = 'Great '.repeat(downs - 2);
+      return `${prefix}Great ${g('Grand Son', 'Grand Daughter', 'Grand Child')}`;
     }
     if (ups > 0 && downs > 0) {
       return 'Cousin';
@@ -182,9 +182,9 @@ function interpretPath(path, nodes) {
     // Direct in-laws
     if (restStr === 'parent') return destGender === 'male' ? 'Father-in-Law' : destGender === 'female' ? 'Mother-in-Law' : 'Parent-in-Law';
     if (restStr === 'parent,child') return destGender === 'male' ? 'Brother-in-Law' : destGender === 'female' ? 'Sister-in-Law' : 'Sibling-in-Law';
-    if (restStr === 'parent,parent') return destGender === 'male' ? 'Grandfather-in-Law' : destGender === 'female' ? 'Grandmother-in-Law' : 'Grandparent-in-Law';
+    if (restStr === 'parent,parent') return destGender === 'male' ? 'Grand Father-in-Law' : destGender === 'female' ? 'Grand Mother-in-Law' : 'Grand Parent-in-Law';
     if (restStr === 'parent,parent,child') return destGender === 'male' ? 'Uncle-in-Law' : destGender === 'female' ? 'Aunt-in-Law' : 'Uncle/Aunt-in-Law';
-    if (restStr === 'child') return destGender === 'male' ? 'Stepson' : destGender === 'female' ? 'Stepdaughter' : 'Stepchild';
+    if (restStr === 'child') return destGender === 'male' ? 'Step Son' : destGender === 'female' ? 'Step Daughter' : 'Step Child';
 
     const rightLabel = getBloodRelation(restVias, destGender);
     return rightLabel ? `${spouseTerm}'s ${rightLabel}` : `Spouse's Relative`;
@@ -198,8 +198,8 @@ function interpretPath(path, nodes) {
     // Direct in-laws
     if (restStr === 'parent,child') return destGender === 'male' ? 'Brother-in-Law' : destGender === 'female' ? 'Sister-in-Law' : 'Sibling-in-Law';
     if (restStr === 'child') return destGender === 'male' ? 'Son-in-Law' : destGender === 'female' ? 'Daughter-in-Law' : 'Child-in-Law';
-    if (restStr === 'child,child') return destGender === 'male' ? 'Grandson-in-Law' : destGender === 'female' ? 'Granddaughter-in-Law' : 'Grandchild-in-Law';
-    if (restStr === 'parent') return destGender === 'male' ? 'Stepfather' : destGender === 'female' ? 'Stepmother' : 'Stepparent';
+    if (restStr === 'child,child') return destGender === 'male' ? 'Grand Son-in-Law' : destGender === 'female' ? 'Grand Daughter-in-Law' : 'Grand Child-in-Law';
+    if (restStr === 'parent') return destGender === 'male' ? 'Step Father' : destGender === 'female' ? 'Step Mother' : 'Step Parent';
 
     const leftPersonId = path[path.length - 2].id;
     const leftNode = nodes.find(n => n.id === leftPersonId);
