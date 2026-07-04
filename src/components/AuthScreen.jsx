@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { TreePine, Mail, Lock, Loader2, ArrowRight, UserPlus, LogIn, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AuthScreen({ initialError }) {
+export default function AuthScreen({ initialError, redirectTo = window.location.origin }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -12,6 +12,12 @@ export default function AuthScreen({ initialError }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(initialError || '');
   const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    // Clear legacy tokens if they existed, so they don't conflict with Supabase
+    localStorage.removeItem('old_app_token');
+    localStorage.removeItem('legacy_user_data');
+  }, []);
 
   const validateForm = () => {
     if (!email) {
@@ -47,7 +53,7 @@ export default function AuthScreen({ initialError }) {
       if (isForgotPassword) {
         // Trigger password reset flow
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin,
+          redirectTo,
         });
         if (error) throw error;
         setSuccessMessage('Password reset link sent! Check your email inbox.');
@@ -85,7 +91,7 @@ export default function AuthScreen({ initialError }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: window.location.origin
+          redirectTo
         }
       });
       if (error) throw error;
@@ -147,6 +153,7 @@ export default function AuthScreen({ initialError }) {
                 <Mail size={16} className="auth-input-icon" />
                 <input
                   type="email"
+                  data-testid="auth-email-input"
                   className="auth-input"
                   placeholder="name@example.com"
                   value={email}
@@ -165,6 +172,7 @@ export default function AuthScreen({ initialError }) {
                   <Lock size={16} className="auth-input-icon" />
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    data-testid="auth-password-input"
                     className="auth-input"
                     placeholder="••••••••"
                     value={password}
@@ -243,6 +251,7 @@ export default function AuthScreen({ initialError }) {
 
             <button 
               type="submit" 
+              data-testid="auth-submit-btn"
               className="auth-submit-btn" 
               disabled={loading}
             >

@@ -22,7 +22,7 @@ import MarriageEdge from './components/MarriageEdge';
 import SpouseEdge from './components/SpouseEdge';
 import JunctionNode from './components/JunctionNode';
 import { initialNodes, initialEdges } from './data';
-import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, LogOut, Share2, Settings, ChevronDown } from 'lucide-react';
+import { Search, Save, Plus, Wand2, TreePine, Undo2, Redo2, Trash2, Check, Download, Upload, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BranchSwitcher from './components/BranchSwitcher';
 import CustomDialog from './components/CustomDialog';
@@ -426,7 +426,7 @@ function FlowApp({ session, onSessionUpdate }) {
   const [dbStatus, setDbStatus] = useState('loading'); // 'loading', 'connected', 'fallback'
   const [isSaving, setIsSaving] = useState(false);
   const [saveToastMsg, setSaveToastMsg] = useState('Tree saved successfully');
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  // const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
 
@@ -1353,7 +1353,10 @@ function FlowApp({ session, onSessionUpdate }) {
     downloadAnchor.remove();
   };
 
+  // eslint-disable-next-line no-unused-vars
   const [showExportMenu, setShowExportMenu] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleExportPNG = async () => {
     setShowExportMenu(false);
@@ -1913,6 +1916,7 @@ export default function App() {
   useEffect(() => {
     // Check if the URL hash contains recovery token indicators
     if (window.location.hash.includes('type=recovery') || window.location.href.includes('type=recovery')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsResettingPassword(true);
     }
 

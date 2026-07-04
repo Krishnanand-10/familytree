@@ -30,6 +30,7 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchShares();
       setStatusMessage({ type: '', text: '' });
       setEmailInput('');
@@ -64,6 +65,7 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
         setStatusMessage({ type: 'error', text: errData.error || 'Failed to share tree.' });
       }
     } catch (err) {
+      console.error(err);
       setStatusMessage({ type: 'error', text: 'Error connecting to server.' });
     } finally {
       setSubmitting(false);
@@ -82,6 +84,7 @@ const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }
         setStatusMessage({ type: 'error', text: 'Failed to revoke access.' });
       }
     } catch (err) {
+      console.error(err);
       setStatusMessage({ type: 'error', text: 'Error connecting to server.' });
     }
   };
