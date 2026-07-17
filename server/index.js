@@ -11,8 +11,8 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '15mb' })); // Allow large base64 photos
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
 const DEFAULT_BRANCH_ID = '00000000-0000-0000-0000-000000000000'; // Seed branch from schema.sql
 
 let supabase = null;
