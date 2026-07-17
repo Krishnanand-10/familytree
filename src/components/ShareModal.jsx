@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, UserPlus, Trash2, Mail, Shield, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 const ShareModal = ({ isOpen, onClose, branchId, apiFetch, userEmail, userRole }) => {
   const [shares, setShares] = useState([]);

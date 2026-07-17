@@ -552,6 +552,10 @@ app.post('/api/tree', requireAuth, async (req, res) => {
 });
 
 // Start Server
-app.listen(port, () => {
-  console.log(`Kinship API Server running on http://localhost:${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Kinship API Server running on http://localhost:${port}`);
+  });
+}
+
+export default app;
